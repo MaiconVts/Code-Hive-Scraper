@@ -1,5 +1,4 @@
 import requests
-import uuid  # Para gerar IDs únicos para as vagas
 from datetime import datetime
 from .base_scraper import BaseScraper  # Importando o molde
 
@@ -21,20 +20,18 @@ class GupyScraper(BaseScraper):
             return "on-site"
         return "remote" # Padrão para evitar erros
 
-    def buscar_vagas(self, palavra_chave: str, modalidade: str) -> list:
+    def buscar_vagas(self, palavra_chave: str, modalidade: str, limite: int = 25) -> list:
         """Implementação obrigatória do método de busca."""
         url = "https://employability-portal.gupy.io/api/v1/jobs"
         tipo_trabalho = self._mapear_modalidade(modalidade)
         
         parametros = {
             "jobName": palavra_chave,
-            "limit": 25,  # Limite de Requisições, pode ser necessario aumentar para 50-100 dependendo do volume de vagas
+            "limit": limite,  # Limite de Requisições, pode ser necessario aumentar para 50-100 dependendo do volume de vagas
             "offset": 0,
             "workplaceType": tipo_trabalho
         }
-        
-        # print(f"    --> Requisitando API Gupy: termo='{palavra_chave}', tipo='{tipo_trabalho}'...") <-- debug para encontrar o parametro correto
-        
+                
         try:
             # Algoritmo Anti-Bloqueio: Exponential Backoff com Jitter.
             response = self.fazer_requisicao_segura(url, params=parametros)
@@ -51,12 +48,12 @@ class GupyScraper(BaseScraper):
                 
                 # Usa o metoda da classe mãe para garantir o padrão!
                 vaga = self.padronizar_vaga(
-                    id_vaga=str(uuid.uuid4()),  # Gerando um ID único
+                    id_vaga=self.gerar_id_deterministico(link),  # Gerando um ID único determinístico a partir do link
                     titulo=item.get('name', 'Título não informado'),
                     empresa=item.get('careerPageName', 'Confidencial'),
                     modalidade=modalidade,
                     link=link,
-                    data_pub=item.get('publishedDate', datetime.now().isoformat())  # Data atual, pois a API não fornece data de publicação
+                    data_pub=item.get('publishedDate')  # Data atual, pois a API não fornece data de publicação
                 )
                 vagas_formatadas.append(vaga)
                 
