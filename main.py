@@ -59,78 +59,125 @@ def salvar_dados_atomico(lista_vagas):
     
     
 def iniciar_scraping():
-    """Função principoal que orquestra as buscas."""
-    print("="*60)
-    print("INICIANDO AS BUSCAS DE VAGAS PARA O CODE HIVE!")
-    print("="*60)
+    """Função principal que orquestra as buscas."""
+    exibir_cabecalho()
     
     config = carregar_configuracoes()
     if not config:
         return
-    palavras_chave = config['filtros_de_busca']['palavras_chave']
-    modalidades = config['filtros_de_busca']['modalidades']
-    plataformas = config['configuracoes_gerais']['plataformas_alvo']
     
-    print(f"Configurações carregadas: {len(palavras_chave)} palavras-chave, {len(modalidades)} modalidades, {len(plataformas)} plataformas.")
-    print(f"Plataformas alvo: {', '.join(plataformas).upper()}")
-    print("-"*60)
+    parametros = extrair_parametros(config)
+    exibir_info_configuracoes(parametros)
     
-    urls_vistas = set()  # Tabelas Hash para deduplicação
+    resultados = executar_buscas(parametros)
+    finalizar_scraping(resultados)
+
+
+def exibir_cabecalho():
+    """Exibe o cabeçalho inicial do scraper."""
+    print("=" * 60)
+    print("INICIANDO AS BUSCAS DE VAGAS PARA O CODE HIVE!")
+    print("=" * 60)
+
+
+def extrair_parametros(config: dict) -> dict:
+    """Extrai e organiza os parâmetros de configuração."""
+    return {
+        'palavras_chave': config['filtros_de_busca']['palavras_chave'],
+        'modalidades': config['filtros_de_busca']['modalidades'],
+        'plataformas': config['configuracoes_gerais']['plataformas_alvo'],
+        'limite_busca': config['configuracoes_gerais']['limite_vagas_por_pesquisa']
+    }
+
+
+def exibir_info_configuracoes(parametros: dict):
+    """Exibe informações sobre as configurações carregadas."""
+    print(f"Configurações carregadas: {len(parametros['palavras_chave'])} palavras-chave, "
+          f"{len(parametros['modalidades'])} modalidades, "
+          f"limite de {parametros['limite_busca']} vagas.")
+    print(f"Plataformas alvo: {', '.join(parametros['plataformas']).upper()}")
+    print("-" * 60)
+
+
+def executar_buscas(parametros: dict) -> dict:
+    """Executa o loop principal de buscas."""
+    urls_vistas = set()
     todas_as_vagas = []
     total_combinacoes = 0
+    total_duplicadas = 0
     
-    # Loop Principal: Plataforma -> Palavra-Chave -> Modalidade
-    for plataforma in plataformas:
-        nome_plataforma = plataforma.lower()
-        
-        # 1 - Roteamento: Verifica se o scraper existe no dicionario
-        if nome_plataforma not in SCRAPERS_DISPONIVEIS:
-            print(f"[AVISO]: Plataforma '{plataforma}' não tem um scraper implementado. Pulando...")
+    for plataforma in parametros['plataformas']:
+        scraper = obter_scraper(plataforma)
+        if not scraper:
             continue
         
-        # 2 - Pega a instância do scraper correspondente(*Classe criada la em cima)
-        scraper = SCRAPERS_DISPONIVEIS[nome_plataforma]
-
-        for palavra in palavras_chave:
-            for modalidade in modalidades:
+        for palavra in parametros['palavras_chave']:
+            for modalidade in parametros['modalidades']:
                 total_combinacoes += 1
                 
-                print(f"[INFO]: Buscando por '{palavra}' na modalidade '{modalidade}' na plataforma '{plataforma}'...")
+                print(f"[INFO]: Buscando '{palavra}' - '{modalidade}' - '{plataforma}'...")
                 
-                # 3 - Chama o metodo padronizado da classe abstrata
-                vagas_encontradas = scraper.buscar_vagas(palavra, modalidade)
+                vagas_encontradas = scraper.buscar_vagas(palavra, modalidade, parametros['limite_busca'])
                 
-                if vagas_encontradas:
-                    vagas_unicas = []
-                    duplicadas = 0
-                    
-                    # Filtro o(1) usando Set para evitar lixo no JSON
-                    for vaga in vagas_encontradas:
-                        if vaga['link'] not in urls_vistas:
-                            urls_vistas.add(vaga['link'])
-                            vagas_unicas.append(vaga)
-                        else:
-                            duplicadas += 1
-                            
-                    if vagas_unicas:
-                        print(f"[SUCESSO]: Encontradas {len(vagas_unicas)} vagas únicas para '{palavra}' na modalidade '{modalidade}' na plataforma '{plataforma}'.")
-                        todas_as_vagas.extend(vagas_unicas)
-                    else:
-                        print(f"[AVISO]: Foram encontradas vagas, mas todas já estavam no banco de dados.")    
+                vagas_novas, duplicadas = filtrar_duplicadas(vagas_encontradas, urls_vistas)
+                total_duplicadas += duplicadas
+                
+                if vagas_novas:
+                    print(f"[SUCESSO]: {len(vagas_novas)} vagas únicas adicionadas.")
+                    todas_as_vagas.extend(vagas_novas)
+                elif duplicadas > 0:
+                    print(f"[AVISO]: {duplicadas} vagas duplicadas ignoradas.")
                 else:
-                    print(f"[AVISO]: Nenhuma vaga encontrada para '{palavra}' na modalidade '{modalidade}' na plataforma '{plataforma}'.")                    
-                # Delay etico entre as requisições para evitar bloqueios (pode ser ajustado conforme necessário)
-                
-    print("-"*60)
-    print(f"Orquestração finalizada! Total de combinações pesquisadas: {total_combinacoes}")
-
-    # Salva os resultados no arquivo JSON
-    if todas_as_vagas:
-        salvar_dados_atomico(todas_as_vagas)
-    else:
-        print("[AVISO]: Nenhuma vaga nova foi encontrada. O arquivo JSON não será atualizado.")
-    print("="*60)
+                    print(f"[AVISO]: Nenhuma vaga encontrada.")
     
-# Ponto de entrada do script
+    return {
+        'vagas': todas_as_vagas,
+        'total_combinacoes': total_combinacoes,
+        'total_duplicadas': total_duplicadas
+    }
+
+
+def obter_scraper(plataforma: str):
+    """Obtém a instância do scraper para a plataforma especificada."""
+    nome_plataforma = plataforma.lower()
+    
+    if nome_plataforma not in SCRAPERS_DISPONIVEIS:
+        print(f"[AVISO]: Plataforma '{plataforma}' não implementada. Pulando...")
+        return None
+    
+    return SCRAPERS_DISPONIVEIS[nome_plataforma]
+
+
+def filtrar_duplicadas(vagas: list, urls_vistas: set) -> tuple:
+    """Filtra vagas duplicadas usando Set. Retorna (vagas_unicas, count_duplicadas)."""
+    vagas_unicas = []
+    duplicadas = 0
+    
+    for vaga in vagas:
+        if vaga['link'] not in urls_vistas:
+            urls_vistas.add(vaga['link'])
+            vagas_unicas.append(vaga)
+        else:
+            duplicadas += 1
+    
+    return vagas_unicas, duplicadas
+
+
+def finalizar_scraping(resultados: dict):
+    """Finaliza o processo exibindo estatísticas e salvando dados."""
+    print("-" * 60)
+    print(f"Orquestração finalizada!")
+    print(f"  • Combinações pesquisadas: {resultados['total_combinacoes']}")
+    print(f"  • Vagas únicas encontradas: {len(resultados['vagas'])}")
+    print(f"  • Vagas duplicadas ignoradas: {resultados['total_duplicadas']}")
+    
+    if resultados['vagas']:
+        salvar_dados_atomico(resultados['vagas'])
+    else:
+        print("[AVISO]: Nenhuma vaga nova encontrada. JSON não atualizado.")
+    
+    print("=" * 60)
+
+
 if __name__ == "__main__":
     iniciar_scraping()
