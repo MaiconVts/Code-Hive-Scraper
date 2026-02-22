@@ -1,14 +1,19 @@
 # scrapers/base_scraper.py
 from abc import ABC, abstractmethod
 import requests
-import time
 import random
+import time
+import hashlib # Para criar hashes únicos a partir de URLs ou títulos, se necessário.
 
 class BaseScraper(ABC):
     """
     Classe Abstrata que define o contrato obrigatório para todos os scrapers.
     Padrão de Projeto: Template Method.
     """
+    def gerar_id_deterministico(self, link: str) -> str:
+        """ Gera um ID único e determinístico a partir de uma URL. """
+        return hashlib.md5(link.encode('utf-8')).hexdigest()[:16]  # Retorna os primeiros 16 caracteres do hash para um ID compacto
+    
     def __init__(self, nome_plataforma: str):
         self.nome_plataforma = nome_plataforma
         
