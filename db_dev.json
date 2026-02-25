@@ -1,0 +1,94 @@
+{
+    "vagas": [
+        {
+            "id": "7c5931bae0317e2b",
+            "titulo": "Pessoa Desenvolvedora iOS Sênior",
+            "empresa": "VENHA SER #SANGUELARANJA 🧡🚀",
+            "modalidade": "Remoto",
+            "link": "https://fcamara.gupy.io/job/eyJqb2JJZCI6MTA5MDA2MDUsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T21:19:38.845Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "c9597012d828c503",
+            "titulo": "Desenvolvedor (a) NET Sênior",
+            "empresa": "VENHA SER #SANGUELARANJA 🧡🚀",
+            "modalidade": "Remoto",
+            "link": "https://fcamara.gupy.io/job/eyJqb2JJZCI6MTA5MDA1OTMsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T21:12:07.807Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "c121f38bac963c03",
+            "titulo": "Desenvolvedor C# - Pleno",
+            "empresa": "Grupo CM",
+            "modalidade": "Remoto",
+            "link": "https://cmcorp.gupy.io/job/eyJqb2JJZCI6MTA5MDYyMTAsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T21:02:25.528Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "03849372ce729c22",
+            "titulo": "Pessoa Desenvolvedora Full Stack Pleno   ",
+            "empresa": "VENHA SER #SANGUELARANJA 🧡🚀",
+            "modalidade": "Remoto",
+            "link": "https://fcamara.gupy.io/job/eyJqb2JJZCI6MTA5MDQ4MzIsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T19:31:30.251Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "84ec1ae7751ee9b5",
+            "titulo": "Pessoa Desenvolvedora Fullstack  Java/React Sr (Remoto) l Cód. 1818",
+            "empresa": "Softplan",
+            "modalidade": "Remoto",
+            "link": "https://softplan.gupy.io/job/eyJqb2JJZCI6MTA2NjE4MTgsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T18:57:51.311Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "6f9df68ed2839b3e",
+            "titulo": "Estagiário(a) - Central de Operações",
+            "empresa": "CIEE - Centro de Integração Empresa-Escola",
+            "modalidade": "Remoto",
+            "link": "https://ciee.gupy.io/job/eyJqb2JJZCI6MTA4ODcyMzEsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-25T12:18:07.679Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "c623ed2dbd30b736",
+            "titulo": "Estagiário(a) - Central de Operações ",
+            "empresa": "CIEE - Centro de Integração Empresa-Escola",
+            "modalidade": "Remoto",
+            "link": "https://ciee.gupy.io/job/eyJqb2JJZCI6MTA3Mjk0ODIsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-24T16:48:20.960Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "4c301eba89282423",
+            "titulo": "Estagiário(a) - Central de Operações",
+            "empresa": "CIEE - Centro de Integração Empresa-Escola",
+            "modalidade": "Remoto",
+            "link": "https://ciee.gupy.io/job/eyJqb2JJZCI6MTA4NzkxNjMsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-23T17:49:18.953Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "093e33c1cbe76fca",
+            "titulo": "Estagiário(a)  Consultoria Técnica NFSE",
+            "empresa": "Grupo TecnoSpeed",
+            "modalidade": "Remoto",
+            "link": "https://grupotecnospeed.gupy.io/job/eyJqb2JJZCI6MTA4NDk0MDgsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-13T20:28:07.715Z",
+            "origem": "Gupy"
+        },
+        {
+            "id": "eeb635ba3b8fe43d",
+            "titulo": "Estagiário de Sucesso do Cliente (CS)",
+            "empresa": "nola",
+            "modalidade": "Remoto",
+            "link": "https://nola.gupy.io/job/eyJqb2JJZCI6MTA4NTU3NTMsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal",
+            "data_publicacao": "2026-02-13T16:10:08.963Z",
+            "origem": "Gupy"
+        }
+    ]
+}
