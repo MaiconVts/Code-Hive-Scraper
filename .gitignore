@@ -1,17 +1,18 @@
+# --- Credenciais e Segurança ---
+secrets/
+*adminsdk*.json
+.env
+
 # --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
-.env
 
 # --- Arquivos Temporários do Scraper ---
-# Ignora o arquivo temporário de escrita atômica
 db_temp.json
-# Opcional: Se precisar ignora o bd local e manter apenas o temporário, descomente a linha abaixo
-# db.json
 
-# --- Node.js (Usados pelo JSON Server e ferramentas JS) ---
+# --- Node.js ---
 node_modules/
 npm-debug.log
 yarn-error.log
