@@ -1,0 +1,33 @@
+name: Code Hive Scraper
+
+on:
+  schedule:
+    - cron: '24 6 * * *'  # 03:24 horário de Brasília (UTC-3 = 06:24 UTC)
+  workflow_dispatch:        # permite rodar manualmente pelo GitHub
+
+jobs:
+  scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install requests firebase-admin python-dotenv
+
+      - name: Criar arquivo de credenciais Firebase
+        run: echo '${{ secrets.FIREBASE_CREDENTIALS }}' > secrets/firebase_key.json
+
+      - name: Criar .env
+        run: |
+          echo "FIREBASE_KEY_PATH=secrets/firebase_key.json" >> .env
+          echo "FIREBASE_DB_URL=${{ secrets.FIREBASE_DB_URL }}" >> .env
+
+      - name: Executar scraper
+        run: python main.py
