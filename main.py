@@ -29,8 +29,8 @@ SCRAPERS_DISPONIVEIS = {
 # Nome do arquivo de banco de dados para o JSON SERVER
 ARQUIVO_DB_TEMP = "db_temp.json"  # Arquivo temporário para evitar corrupção de dados durante a escrita
 CATEGORIAS = {
-    "tecnologia": {"queries": "queries_tecnologia.json", "db": "db_tecnologia.json", "rota": "/vagas-tecnologia"},
-    "direito":    {"queries": "queries_direito.json",    "db": "db_direito.json",    "rota": "/vagas-direito"},
+    "dev": {"queries": "queries_tecnologia.json", "db": "db_dev.json", "rota": "/vagas-dev"},
+    "adv": {"queries": "queries_advogados.json",  "db": "db_adv.json", "rota": "/vagas-adv"},
 }
 
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_KEY_PATH")
@@ -67,7 +67,8 @@ def enviar_para_firebase(lista_vagas: list, rota: str):
     """
     try:
         ref = db.reference(rota)
-        ref.set(lista_vagas)
+        vagas_dict = {vaga['id']: vaga for vaga in lista_vagas}
+        ref.set(vagas_dict)
         print(f"[FIREBASE]: {len(lista_vagas)} vagas enviadas para '{rota}' com sucesso.")
     except Exception as e:
         print(f"[FIREBASE ERRO]: Falha ao enviar dados. Erro: {str(e)}")
