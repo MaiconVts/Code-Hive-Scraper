@@ -22,7 +22,9 @@ jobs:
         run: pip install requests firebase-admin python-dotenv
 
       - name: Criar arquivo de credenciais Firebase
-        run: echo '${{ secrets.FIREBASE_CREDENTIALS }}' > secrets/firebase_key.json
+        run: |
+          mkdir -p secrets
+          echo '${{ secrets.FIREBASE_CREDENTIALS }}' > secrets/firebase_key.json
 
       - name: Criar .env
         run: |
