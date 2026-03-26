@@ -4,6 +4,6 @@ export interface IVaga {
     empresa: string;
     modalidade: string;
     link: string;
-    dataPublicacao: string; 
+    data_publicacao: string; 
     origem: string;
 }
