@@ -179,47 +179,47 @@ FIREBASE_DB_URL=https://code-hive-vagas-default-rtdb.firebaseio.com
 - Credenciais protegidas via GitHub Secrets + .gitignore
 
 ### 🔵 Em andamento — Sprint 2 (Web)
-- [ ] Criar projeto React + Vite em `code-hive-web/`
-- [ ] Configurar Firebase SDK no frontend
-- [ ] Validar consumo de dados reais do Firebase
+- [x] Criar projeto React + Vite em `code-hive-web/`
+- [x] Configurar Firebase SDK no frontend
+- [x] Validar consumo de dados reais do Firebase
 
 ### 📋 A fazer — Sprint 3 (Design System)
-- [ ] Definir paleta completa de cores
-- [ ] Definir tipografia (família, tamanhos, pesos)
-- [ ] Definir estados visuais (erro, sucesso, alerta, vazio, loading)
-- [ ] Importar logos e animação de transição
-- [ ] Documentar em `constants/colors.ts` e `constants/typography.ts`
+- [x] Definir paleta completa de cores
+- [x] Definir tipografia (família, tamanhos, pesos)
+- [x] Definir estados visuais (erro, sucesso, alerta, vazio, loading)
+- [x] Importar logos e animação de transição
+- [x] Documentar em `constants/colors.ts` e `constants/typography.ts`
 
 ### 📋 A fazer — Sprint 4 (Prototipação)
-- [ ] Prototipar telas no Figma/V0/Galileo
-- [ ] Validar fluxo de navegação antes de codar
+- [x] Prototipar telas no Figma/V0/Galileo
+- [x] Validar fluxo de navegação antes de codar
 
 ### 📋 A fazer — Sprint 5 (Telas Web)
-- [ ] Página de vagas Dev com FlatList + VagaCard
-- [ ] Página de vagas Jurídico
-- [ ] Navegação com React Router
-- [ ] Página de detalhe da vaga
-- [ ] Filtros por modalidade e data (useMemo)
-- [ ] Cache local
+- [x] Página de vagas Dev com FlatList + VagaCard
+- [x] Página de vagas Jurídico
+- [x] Navegação com React Router
+- [x] Página de detalhe da vaga
+- [x] Filtros por modalidade e data (useMemo)
+- [] Cache local
 
 ### 📋 A fazer — Sprint 6 (Qualidade)
-- [ ] Aplicar design system completo
-- [ ] Testar em múltiplos navegadores
-- [ ] Validar responsividade
+- [x] Aplicar design system completo
+- [] Testar em múltiplos navegadores
+- [x] Validar responsividade
 
 ### 📋 A fazer — Sprint 7 (Deploy)
-- [ ] Deploy via Vercel ou Firebase Hosting
-- [ ] URL pública funcional
+- [] Deploy via Vercel ou Firebase Hosting
+- [] URL pública funcional
 
 ### 🚫 Bloqueado — Sprint 8 (Mobile)
-- [ ] Configurar AVD + Expo Orbit
-- [ ] Adaptar web para React Native
-- [ ] Gerar APK
+- [] Configurar AVD + Expo Orbit
+- [] Adaptar web para React Native
+- [] Gerar APK
 
 ### 🚫 Bloqueado — Sprint 9 (Repositório Final)
-- [ ] Licença All Rights Reserved
-- [ ] README final completo
-- [ ] Badges de status
+- [] Licença All Rights Reserved
+- [] README final completo
+- [] Badges de status
 
 ---
 
