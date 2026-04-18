@@ -30,9 +30,48 @@ class BaseScraper(ABC):
         a implementarem sua própria lógica de busca na web ou API.
         """
         pass
+
+    def _normalizar_campo(self, valor, default: str = 'Não informado') -> str:
+        """
+        Sanitiza qualquer campo de texto antes de salvar.
+        Trata None, strings vazias, e strings só com espaços.
+        Equivalente em C#: value?.Trim() ?? defaultValue
+        """
+        if valor is None:
+            return default
+        if isinstance(valor, bool):
+            return valor  # Booleanos passam direto sem virar string
+        if isinstance(valor, str):
+            valor = valor.strip()
+            return valor if valor else default
+        return valor  # int, float, etc — retorna como está
     
-    def padronizar_vaga(self, id_vaga: str, titulo: str, empresa: str, modalidade: str, link: str, data_pub: str) -> dict:
-        """ Complexidade de Tempo: $O(1)$ para a criação do registro. """
+    def padronizar_vaga(
+        self,
+        id_vaga: str,
+        titulo: str,
+        empresa: str,
+        modalidade: str,
+        link: str,
+        data_pub: str,
+        # --- CAMPOS NOVOS (opcionais para não quebrar scrapers existentes) ---
+        city: str = None,
+        state: str = None,
+        country: str = None,
+        workplace_type: str = None,
+        is_remote: bool = None,
+        tipo_contrato: str = None,
+        prazo_inscricao: str = None,
+        pcd: bool = None,
+    ) -> dict:
+        """
+        Monta o dicionário padronizado da vaga.
+        Complexidade de Tempo: O(1) para a criação do registro.
+        
+        Parâmetros novos usam default None — scrapers antigos continuam
+        funcionando sem passar esses valores (não quebra assinatura).
+        O _normalizar_campo trata None/vazio antes de salvar.
+        """
         return {
             "id": id_vaga,
             "titulo": titulo,
@@ -40,8 +79,18 @@ class BaseScraper(ABC):
             "modalidade": modalidade,
             "link": link,
             "data_publicacao": data_pub,
-            "origem": self.nome_plataforma
+            "origem": self.nome_plataforma,
+            # --- CAMPOS NOVOS ---
+            "city": self._normalizar_campo(city),
+            "state": self._normalizar_campo(state),
+            "country": self._normalizar_campo(country, default='Brasil'),
+            "workplace_type": self._normalizar_campo(workplace_type),
+            "is_remote": self._normalizar_campo(is_remote, default=False),
+            "tipo_contrato": self._normalizar_campo(tipo_contrato),
+            "prazo_inscricao": self._normalizar_campo(prazo_inscricao),
+            "pcd": self._normalizar_campo(pcd, default=False),
         }
+
     def fazer_requisicao_segura(self, url: str, params: dict = None) -> requests.Response:
         """
         Algoritmo Anti-Bloqueio: Exponential Backoff com Jitter.
