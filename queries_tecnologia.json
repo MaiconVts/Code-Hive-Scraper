@@ -95,10 +95,8 @@
     ],
     "modalidades": [
       "Remoto",
-      "Home Office",
       "Híbrido",
-      "Presencial",
-      "Teletrabalho"
-    ]
+      "Presencial"
+]
   }
 }
