@@ -40,6 +40,7 @@ class GupyScraper(BaseScraper):
             'vacancy_type_associated': 'Associado',
             'vacancy_type_freelancer': 'Freelancer',
             'vacancy_type_talent_pool': 'Banco de Talentos',
+            'vacancy_type_autonomous': 'Autônomo',
         }
         return mapa.get(tipo_api, tipo_api or 'Não informado')
 
