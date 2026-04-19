@@ -5,20 +5,31 @@ import {
   ChevronRight,
   MapPin,
   GraduationCap,
+  Briefcase,
+  Accessibility,
 } from "lucide-react";
 import { getVagas } from "../services/api";
 import type { IVaga } from "../types/IVaga";
 import { ROUTES } from "../constants/routes";
 import VagaDetalhe from "../components/VagaDetalhe";
 import PageTransition from "../components/PageTransition";
-import { useFiltrosVagas } from "../hooks/useFiltrosVagas"; // Ajuste o caminho se necessário
+import { useFiltrosVagas } from "../hooks/useFiltrosVagas";
 
 const modalidadeCor: Record<string, string> = {
   Remoto: "#4FC3F7",
-  "Home Office": "#4FC3F7",
   Híbrido: "#FFB703",
   Presencial: "#A0AEC0",
-  Teletrabalho: "#4FC3F7",
+};
+
+const contratoCor: Record<string, string> = {
+  CLT: "#4FC3F7",
+  PJ: "#FFB703",
+  Estágio: "#A78BFA",
+  "Jovem Aprendiz": "#34D399",
+  Temporário: "#F87171",
+  Freelancer: "#FB923C",
+  Autônomo: "#FB923C",
+  "Banco de Talentos": "#94A3B8",
 };
 
 function formatarData(iso: string): string {
@@ -30,12 +41,30 @@ function formatarData(iso: string): string {
   }
 }
 
+function corPrazo(prazoIso: string): { cor: string; texto: string } {
+  const hoje = new Date();
+  const prazo = new Date(prazoIso);
+  const dias = Math.ceil(
+    (prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (dias < 0) return { cor: "#F87171", texto: "expirada" };
+  if (dias <= 7)
+    return { cor: "#FFB703", texto: `até ${formatarData(prazoIso)}` };
+  return { cor: "#34D399", texto: `até ${formatarData(prazoIso)}` };
+}
+
+const selectBase: React.CSSProperties = {
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.09)",
+  borderRadius: "10px",
+};
+
 export default function VagasDev() {
   const [vagasRaw, setVagasRaw] = useState<IVaga[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [vagaSelecionada, setVagaSelecionada] = useState<IVaga | null>(null);
 
-  // Instanciando nosso Custom Hook de filtros (Crie este arquivo separado)
   const {
     busca,
     setBusca,
@@ -43,10 +72,16 @@ export default function VagasDev() {
     setFiltroModalidade,
     ordenacao,
     setOrdenacao,
-    filtroLocalidade,
-    setFiltroLocalidade,
+    filtroEstado,
+    setFiltroEstado,
     filtroNivel,
     setFiltroNivel,
+    filtroContrato,
+    setFiltroContrato,
+    filtroPcd,
+    setFiltroPcd,
+    estadosDisponiveis,
+    contratosDisponiveis,
     paginaAtual,
     setPaginaAtual,
     vagasFiltradas,
@@ -66,27 +101,58 @@ export default function VagasDev() {
 
   return (
     <PageTransition>
-      {/* Contêiner Pai Absoluto: Força 100% da largura, centraliza tudo e dá o espaço do Header (pt-[140px]) */}
+      {/* CSS responsivo para filtros — inline styles não suportam @media */}
+      <style>{`
+        .filtros-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+          width: 100%;
+        }
+        @media (max-width: 768px) {
+          .filtros-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (max-width: 480px) {
+          .filtros-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
       <div
-        className="min-h-screen w-full flex flex-col items-center pt-[140px] pb-16 px-6 lg:px-8"
-        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        className="min-h-screen w-full flex flex-col items-center pb-16 px-6 lg:px-8 overflow-x-hidden"
+        style={{ fontFamily: "'Space Grotesk', sans-serif", marginTop: "64px" }}
       >
-        {/* Contêiner de Conteúdo: Limita a largura para não esticar em monitores gigantes e usa flex-col com gap para espaçamento vertical */}
         <div className="w-[92%] max-w-[1200px] flex flex-col gap-10">
-          {/* Cabeçalho da página */}
-          <div className="text-center w-full">
-            <p className="text-[11px] text-[#4FC3F7] tracking-[0.3em] uppercase mb-2">
+          {/* Espaçador do header fixo */}
+          <div className="h-0.1" />
+          {/* Hero */}
+          <div className="text-center w-full py-6">
+            <p className="text-[11px] text-[#4FC3F7] tracking-[0.3em] uppercase mb-3 mt-6">
               Tecnologia & Desenvolvimento
             </p>
-            <h1 className="text-[32px] font-bold text-white flex items-center justify-center gap-3">
+            <h1
+              className="text-[42px] sm:text-[52px] font-bold text-white mb-3"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                textShadow:
+                  "0 0 30px rgba(79,195,247,0.4), 0 0 60px rgba(79,195,247,0.15)",
+              }}
+            >
               Vagas Dev
             </h1>
+            <p className="text-[14px] text-[#A0AEC0]">
+              {carregando
+                ? "Carregando vagas..."
+                : `${vagasFiltradas.length} vagas disponíveis agora`}
+            </p>
           </div>
 
-          {/* ================= INÍCIO DA ÁREA ALTERADA (FILTROS) ================= */}
-          {/* Barra de Busca e Filtros Avançados */}
+          {/* Barra de Filtros */}
           <div
-            className="flex flex-col xl:flex-row items-center justify-between gap-4 px-6 py-5 w-full"
+            className="flex flex-col gap-4 px-6 py-5 w-full"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.09)",
@@ -94,57 +160,96 @@ export default function VagasDev() {
               backdropFilter: "blur(12px)",
             }}
           >
-            {/* Input de Busca */}
-            <div className="relative w-full xl:w-[35%] flex items-center">
-              <Search
-                className="absolute left-4"
-                size={16}
-                color="#4FC3F7"
-                style={{ pointerEvents: "none" }}
-              />
-              <input
-                type="text"
-                placeholder="Ex: C# .NET Pleno"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="w-full h-[44px] text-[14px] text-white placeholder-[#A0AEC0] outline-none transition-all"
+            {/* Linha 1: Busca + Modalidade + Ordenação */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full overflow-hidden">
+              <div className="relative flex-1 flex items-center">
+                <Search
+                  className="absolute left-4"
+                  size={16}
+                  color="#4FC3F7"
+                  style={{ pointerEvents: "none" }}
+                />
+                <input
+                  type="text"
+                  placeholder="Ex: C# .NET Pleno"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="w-full h-[44px] text-[14px] text-white placeholder-[#A0AEC0] outline-none transition-all"
+                  style={{
+                    background: "rgba(0,0,0,0.2)",
+                    border: "1px solid rgba(255,255,255,0.09)",
+                    borderRadius: "10px",
+                    paddingLeft: "42px",
+                    paddingRight: "16px",
+                  }}
+                  onFocus={(e) =>
+                    (e.currentTarget.style.border =
+                      "1px solid rgba(79,195,247,0.5)")
+                  }
+                  onBlur={(e) =>
+                    (e.currentTarget.style.border =
+                      "1px solid rgba(255,255,255,0.09)")
+                  }
+                />
+              </div>
+
+              <div
+                className="flex items-center gap-1 p-1.5 rounded-[12px] shrink-0"
                 style={{
                   background: "rgba(0,0,0,0.2)",
-                  border: "1px solid rgba(255,255,255,0.09)",
-                  borderRadius: "10px",
-                  paddingLeft: "42px",
-                  paddingRight: "16px",
+                  border: "1px solid rgba(255,255,255,0.05)",
                 }}
-                onFocus={(e) =>
-                  (e.currentTarget.style.border =
-                    "1px solid rgba(79,195,247,0.5)")
+              >
+                {["Remoto", "Híbrido", "Presencial"].map((f) => {
+                  const isActive = filtroModalidade === f;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setFiltroModalidade(isActive ? null : f)}
+                      className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
+                      style={{
+                        background: isActive ? "#FFB703" : "transparent",
+                        color: isActive ? "#050015" : "#A0AEC0",
+                        fontWeight: isActive ? 600 : 500,
+                      }}
+                    >
+                      {f}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <select
+                value={ordenacao}
+                onChange={(e) =>
+                  setOrdenacao(e.target.value as "recente" | "antiga")
                 }
-                onBlur={(e) =>
-                  (e.currentTarget.style.border =
-                    "1px solid rgba(255,255,255,0.09)")
-                }
-              />
+                className="h-[44px] px-4 text-[13px] text-white outline-none cursor-pointer shrink-0"
+                style={{ ...selectBase }}
+              >
+                <option value="recente" style={{ color: "#050015" }}>
+                  Mais recentes
+                </option>
+                <option value="antiga" style={{ color: "#050015" }}>
+                  Mais antigas
+                </option>
+              </select>
             </div>
 
-            {/* Grupo de Filtros Selects - Ajustado para quebrar linha no mobile sem sumir */}
-            <div className="flex flex-wrap items-center justify-start xl:justify-end gap-3 w-full xl:w-auto">
-              
-              {/* Filtro de Nível Hierárquico - Removido 'hidden md:flex', adicionado 'w-full sm:w-auto flex-1' */}
-              <div className="relative flex items-center w-full sm:w-auto flex-1 sm:flex-none">
+            {/* Linha 2: Filtros avançados — Grid responsivo */}
+            <div className="filtros-grid">
+              <div className="relative flex items-center">
                 <GraduationCap
-                  className="absolute left-3"
+                  className="absolute left-3 pointer-events-none"
                   size={15}
                   color="#A0AEC0"
-                  style={{ pointerEvents: "none" }}
                 />
                 <select
                   value={filtroNivel}
                   onChange={(e) => setFiltroNivel(e.target.value)}
                   className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.09)",
-                    borderRadius: "10px",
+                    ...selectBase,
                     paddingLeft: "36px",
                     paddingRight: "16px",
                   }}
@@ -167,88 +272,83 @@ export default function VagasDev() {
                 </select>
               </div>
 
-              {/* Filtro de Localidade - Removido 'hidden md:flex', adicionado 'w-full sm:w-auto flex-1' */}
-              <div className="relative flex items-center w-full sm:w-auto flex-1 sm:flex-none">
+              <div className="relative flex items-center">
                 <MapPin
-                  className="absolute left-3"
+                  className="absolute left-3 pointer-events-none"
                   size={14}
                   color="#A0AEC0"
-                  style={{ pointerEvents: "none" }}
                 />
                 <select
-                  value={filtroLocalidade}
-                  onChange={(e) => setFiltroLocalidade(e.target.value)}
+                  value={filtroEstado}
+                  onChange={(e) => setFiltroEstado(e.target.value)}
                   className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.09)",
-                    borderRadius: "10px",
+                    ...selectBase,
                     paddingLeft: "34px",
                     paddingRight: "16px",
                   }}
                 >
-                  <option value="todas" style={{ color: "#050015" }}>
-                    Qualquer Local
+                  <option value="todos" style={{ color: "#050015" }}>
+                    Qualquer Estado
                   </option>
-                  <option value="nacional" style={{ color: "#050015" }}>
-                    Nacional
-                  </option>
-                  <option value="internacional" style={{ color: "#050015" }}>
-                    Internacional
-                  </option>
+                  {estadosDisponiveis.map((uf) => (
+                    <option key={uf} value={uf} style={{ color: "#050015" }}>
+                      {uf}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Botões de Modalidade Rápida - flex-1 para esticar no mobile */}
-              <div
-                className="flex items-center gap-1 sm:gap-2 p-1.5 rounded-[12px] w-full sm:w-auto justify-between sm:justify-center"
-                style={{
-                  background: "rgba(0,0,0,0.2)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                }}
-              >
-                {["Remoto", "Híbrido", "Presencial"].map((f) => {
-                  const isActive = filtroModalidade === f;
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => setFiltroModalidade(isActive ? null : f)}
-                      className="flex-1 sm:flex-none px-2 sm:px-5 py-2 rounded-lg text-[12px] sm:text-[13px] whitespace-nowrap transition-all duration-200"
-                      style={{
-                        background: isActive ? "#FFB703" : "transparent",
-                        color: isActive ? "#050015" : "#A0AEC0",
-                        fontWeight: isActive ? 600 : 500,
-                      }}
+              <div className="relative flex items-center">
+                <Briefcase
+                  className="absolute left-3 pointer-events-none"
+                  size={14}
+                  color="#A0AEC0"
+                />
+                <select
+                  value={filtroContrato}
+                  onChange={(e) => setFiltroContrato(e.target.value)}
+                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
+                  style={{
+                    ...selectBase,
+                    paddingLeft: "34px",
+                    paddingRight: "16px",
+                  }}
+                >
+                  <option value="todos" style={{ color: "#050015" }}>
+                    Qualquer Contrato
+                  </option>
+                  {contratosDisponiveis.map((tipo) => (
+                    <option
+                      key={tipo}
+                      value={tipo}
+                      style={{ color: "#050015" }}
                     >
-                      {f}
-                    </button>
-                  );
-                })}
+                      {tipo}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Ordenação Estilizada - w-full no mobile */}
-              <select
-                value={ordenacao}
-                onChange={(e) =>
-                  setOrdenacao(e.target.value as "recente" | "antiga")
-                }
-                className="w-full sm:w-auto h-[44px] px-4 text-[13px] text-white outline-none cursor-pointer"
+              <button
+                onClick={() => setFiltroPcd(!filtroPcd)}
+                className="flex items-center justify-center gap-2 h-[44px] px-4 rounded-[10px] text-[13px] transition-all duration-200 whitespace-nowrap"
                 style={{
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.09)",
-                  borderRadius: "10px",
+                  background: filtroPcd
+                    ? "rgba(79,195,247,0.15)"
+                    : "rgba(255,255,255,0.05)",
+                  border: filtroPcd
+                    ? "1px solid rgba(79,195,247,0.4)"
+                    : "1px solid rgba(255,255,255,0.09)",
+                  color: filtroPcd ? "#4FC3F7" : "#A0AEC0",
+                  fontWeight: filtroPcd ? 600 : 400,
                 }}
               >
-                <option value="recente" style={{ color: "#050015" }}>
-                  Mais recentes
-                </option>
-                <option value="antiga" style={{ color: "#050015" }}>
-                  Mais antigas
-                </option>
-              </select>
+                <Accessibility size={14} />
+                PCD
+              </button>
             </div>
           </div>
-          {/* ================= FIM DA ÁREA ALTERADA ================= */}
 
           {/* Loading */}
           {carregando && (
@@ -269,11 +369,20 @@ export default function VagasDev() {
             </div>
           )}
 
-          {/* Grid de Vagas (Ajustado para 3x3 = 9 itens perfeitos no desktop) */}
+          {/* Grid de Vagas */}
           {!carregando && vagasPagina.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
               {vagasPagina.map((vaga) => {
-                const cor = modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
+                const corMod = modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
+                const corCont =
+                  contratoCor[vaga.tipo_contrato || ""] ?? "#94A3B8";
+                const temLocal = vaga.city && vaga.city !== "Não informado";
+                const prazo =
+                  vaga.prazo_inscricao &&
+                  vaga.prazo_inscricao !== "Não informado"
+                    ? corPrazo(vaga.prazo_inscricao)
+                    : null;
+
                 return (
                   <div
                     key={vaga.id}
@@ -284,8 +393,8 @@ export default function VagasDev() {
                       border: "1px solid rgba(255,255,255,0.06)",
                       borderRadius: "16px",
                       backdropFilter: "blur(10px)",
-                      padding: "24px", // Padding aumentado para dar respiro
-                      minHeight: "160px",
+                      padding: "24px",
+                      minHeight: "180px",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.border =
@@ -305,25 +414,23 @@ export default function VagasDev() {
                       e.currentTarget.style.boxShadow = "none";
                     }}
                   >
-                    {/* Linha 1: título + badge */}
-                    <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
                       <h3 className="text-[16px] font-semibold text-white leading-snug flex-1 group-hover:text-[#4FC3F7] transition-colors">
                         {vaga.titulo}
                       </h3>
                       <span
                         className="text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                         style={{
-                          background: `${cor}15`,
-                          color: cor,
-                          border: `1px solid ${cor}30`,
+                          background: `${corMod}15`,
+                          color: corMod,
+                          border: `1px solid ${corMod}30`,
                         }}
                       >
                         {vaga.modalidade}
                       </span>
                     </div>
 
-                    {/* Linha 2: empresa */}
-                    <p className="text-[14px] text-[#A0AEC0] mb-5 flex-1 font-medium">
+                    <p className="text-[14px] text-[#A0AEC0] mb-2 font-medium">
                       {vaga.empresa}
                       <span className="text-[#4a4a6a] mx-2">·</span>
                       <span className="text-[#4a4a6a] text-[12px]">
@@ -331,11 +438,58 @@ export default function VagasDev() {
                       </span>
                     </p>
 
-                    {/* Linha 3: data + link */}
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      {temLocal && (
+                        <span className="text-[11px] text-[#A0AEC0] flex items-center gap-1">
+                          <MapPin size={11} />
+                          {vaga.city}
+                          {vaga.state && vaga.state !== "Não informado"
+                            ? `, ${vaga.state}`
+                            : ""}
+                        </span>
+                      )}
+                      {vaga.tipo_contrato &&
+                        vaga.tipo_contrato !== "Não informado" && (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{
+                              background: `${corCont}15`,
+                              color: corCont,
+                              border: `1px solid ${corCont}30`,
+                            }}
+                          >
+                            {vaga.tipo_contrato}
+                          </span>
+                        )}
+                      {vaga.pcd && (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
+                          style={{
+                            background: "rgba(52,211,153,0.15)",
+                            color: "#34D399",
+                            border: "1px solid rgba(52,211,153,0.3)",
+                          }}
+                        >
+                          <Accessibility size={10} />
+                          PCD
+                        </span>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between pt-3 border-t border-[rgba(255,255,255,0.05)]">
-                      <span className="text-[12px] text-[#6b7280]">
-                        {formatarData(vaga.data_publicacao)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[12px] text-[#6b7280]">
+                          {formatarData(vaga.data_publicacao)}
+                        </span>
+                        {prazo && (
+                          <span
+                            className="text-[11px]"
+                            style={{ color: prazo.cor }}
+                          >
+                            {prazo.texto}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[12px] text-[#4FC3F7] font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                         Ver detalhes →
                       </span>
@@ -346,7 +500,7 @@ export default function VagasDev() {
             </div>
           )}
 
-          {/* Paginação Matemática Perfeita */}
+          {/* Paginação */}
           {!carregando && totalPaginas > 1 && (
             <div className="flex items-center justify-center gap-2 mt-4">
               <button
@@ -397,7 +551,7 @@ export default function VagasDev() {
             </div>
           )}
 
-          {/* NOVO: Rodapé Inteligente - Contador de Vagas (Mantido estritamente dentro da estrutura) */}
+          {/* Rodapé */}
           {!carregando && (
             <div className="w-full mt-auto pt-8 flex flex-col sm:flex-row items-center justify-between border-t border-[rgba(255,255,255,0.05)] gap-4 text-center sm:text-left">
               <p className="text-[13px] text-[#A0AEC0]">Atualizado via Gupy</p>
