@@ -6,25 +6,33 @@ from dotenv import load_dotenv
 from scrapers.gupy_scraper import GupyScraper
 import firebase_admin
 from firebase_admin import credentials, db
+import sys
 
 load_dotenv()
 
 # ============================================================
 # CONFIGURAÇÃO DE LOGGING
-# Substitui todos os print() por logging estruturado.
-# - Terminal: mesmo output visual de antes
-# - Arquivo: grava log completo para debug no GitHub Actions
+# Força UTF-8 em todos os handlers para compatibilidade Windows + Linux.
 # ============================================================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%H:%M:%S',
-    handlers=[
-        logging.StreamHandler(),                          # Output no terminal
-        logging.FileHandler('scraper.log', mode='w'),     # Arquivo de log (sobrescreve a cada execução)
-    ]
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter(
+    fmt='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
 )
-logger = logging.getLogger(__name__)
+
+# Handler de arquivo — sempre UTF-8
+file_handler = logging.FileHandler('scraper.log', mode='w', encoding='utf-8')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Handler de terminal — força UTF-8 no Windows, padrão no Linux
+stream_handler = logging.StreamHandler(
+    open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False)
+)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 # Tabela Hash O(1) para rotear os scrapers (Padrão Strategy)
 # Para criar um scraper novo, basta adicionar a chave e o valor correspondente aqui.
