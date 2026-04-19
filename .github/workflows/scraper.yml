@@ -8,6 +8,7 @@ on:
 jobs:
   scraper:
     runs-on: ubuntu-latest
+    timeout-minutes: 90    # Proteção: aborta se travar (ajustar quando adicionar LinkedIn)
 
     steps:
       - name: Checkout do repositório
@@ -33,3 +34,11 @@ jobs:
 
       - name: Executar scraper
         run: python main.py
+
+      - name: Upload de logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-logs
+          path: scraper.log
+          retention-days: 7
