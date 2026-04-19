@@ -2,6 +2,7 @@
 secrets/
 *adminsdk*.json
 .env
+code-hive-web/.env
 
 # --- Python ---
 __pycache__/
