@@ -38,9 +38,13 @@ class GupyScraper(BaseScraper):
             'vacancy_type_independent_contractor': 'PJ',
             'vacancy_legal_entity': 'PJ',
             'vacancy_type_associated': 'Associado',
+            'vacancy_type_associate': 'Associado',
             'vacancy_type_freelancer': 'Freelancer',
             'vacancy_type_talent_pool': 'Banco de Talentos',
             'vacancy_type_autonomous': 'Autônomo',
+            'vacancy_type_lecturer': 'Professor',
+            'vacancy_type_outsource': 'Terceirizado',
+            'vacancy_type_trainee': 'Trainee',
         }
         return mapa.get(tipo_api, tipo_api or 'Não informado')
 
