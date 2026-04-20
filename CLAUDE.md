@@ -204,24 +204,31 @@ FIREBASE_DB_URL=https://code-hive-vagas-default-rtdb.firebaseio.com
 
 ### 📋 A fazer — Sprint 6 (Qualidade)
 - [x] Aplicar design system completo
-- [] Testar em múltiplos navegadores
+- [ ] Testar em múltiplos navegadores
 - [x] Validar responsividade
+- [ ] Implementar cache local no frontend (AsyncStorage/localStorage, TTL 1h) para reduzir reads no Firebase
+- [ ] Pull-to-refresh para invalidar cache manualmente
 
 ### 📋 A fazer — Sprint 7 (Deploy)
-- [] Deploy via Vercel ou Firebase Hosting
-- [] URL pública funcional
+- [ ] Deploy via Vercel ou Firebase Hosting
+- [ ] URL pública funcional
+- [ ] Monitoramento de cota do Firebase (alertas quando próximo do limite)
 
 ### 🚫 Bloqueado — Sprint 8 (Mobile)
-- [] Configurar AVD + Expo Orbit
-- [] Adaptar web para React Native
-- [] Gerar APK
+- [ ] Configurar AVD + Expo Orbit
+- [ ] Adaptar web para React Native
+- [ ] Gerar APK
 
 ### 🚫 Bloqueado — Sprint 9 (Repositório Final)
-- [] Licença All Rights Reserved
-- [] README final completo
-- [] Badges de status
+- [ ] Licença All Rights Reserved
+- [ ] README final completo
+- [ ] Badges de status
 
----
+### 🔮 Futuro — Sprint 10 (Escalabilidade)
+- [ ] Cache backend (Firebase Functions ou Cloudflare Workers) — só se cota do Firebase começar a ficar apertada
+- [ ] Endpoint intermediário servindo dataset cacheado (~1 read/hora no Firebase independente do nº de usuários)
+- [ ] Métricas de uso: reads/dia, usuários ativos, tempo médio de resposta
+- [ ] Considerar migração para Firestore se Realtime DB limitar
 
 ## REGRAS DO PROJETO
 
@@ -231,3 +238,31 @@ FIREBASE_DB_URL=https://code-hive-vagas-default-rtdb.firebaseio.com
 4. **Firebase:** estrutura de dados usa ID determinístico MD5 como chave
 5. **Licença:** All Rights Reserved — uso comercial proibido sem autorização do autor
 6. **Repositório público** — portfólio técnico de Maicon Vitor
+
+
+
+idéias  só para não perder por agora.
+
+
+
+Sobre o padrão hover + dropdown pra Termos/Como usar/Como funciona:
+Funciona muito bem na home, mas tem algumas considerações:
+
+No mobile não tem hover — em React Native e mobile web, hover não existe. Vira tap/touch. Então planeja desde já que no mobile isso vira um click que abre um modal ou navega pra uma tela dedicada. Se você quer "uma única implementação" pra web + mobile, melhor ir de click-to-open direto (vira consistent entre plataformas).
+Para Termos de Uso e Política de Privacidade especificamente — esses não devem ficar só num dropdown de hover. Razões:
+
+LGPD exige que o usuário consiga acessar a qualquer momento, de forma clara
+Play Store / App Store exigem URL pública (tipo myorbita.com.br/privacidade) pra aprovar o app
+Se mudar algo crítico, você precisa notificar usuários — hover dropdown não serve pra isso
+O padrão universal é link fixo no footer ("Termos" | "Privacidade" | "Sobre") — usuários esperam isso
+
+Pode ter no header via hover + dropdown também, mas tenha no footer obrigatoriamente.
+"Como usar" e "Como funciona" — esses sim cabem perfeitamente no dropdown de hover. São informacionais, não-jurídicos, e não precisam de URL pública dedicada. Alternativa ainda melhor: página de onboarding na primeira abertura + tooltip sutil no header depois.
+
+
+Resumo prático:
+ItemOndeComo funcionaHover + dropdown ✅ (ou onboarding)Como usarHover + dropdown ✅ (ou FAQ)Termos de usoFooter fixo + página dedicada ⚠️Política de privacidadeFooter fixo + página dedicada ⚠️Sobre / créditosFooter fixo ou hover, tanto faz
+
+Anota isso pra quando for implementar a home. Agora, bora voltar — já terminou a criação do projeto Firebase?
+
+
