@@ -1,0 +1,55 @@
+name: Scraper LinkedIn
+
+on:
+  # Execução automática diária às 04:45 BRT (07:45 UTC)
+  # Roda ~1h depois da Gupy para garantir isolamento entre execuções.
+  schedule:
+    - cron: '45 7 * * *'
+  # Permite rodar manualmente via Actions → Run workflow
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    name: Executar scraper LinkedIn
+    runs-on: ubuntu-latest
+
+    # LinkedIn é scraping pesado com delays anti-ban (3-6s entre requests,
+    # pausas longas a cada 50 vagas, cooldown entre keywords).
+    # 120min cobre pior caso + margem para retries de circuit breaker.
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install firebase-admin python-dotenv requests curl_cffi lxml
+
+      - name: Criar arquivo de credenciais do Firebase
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: |
+          mkdir -p secrets
+          echo "$FIREBASE_CREDENTIALS" > secrets/firebase_key.json
+
+      - name: Executar scraper LinkedIn
+        env:
+          FIREBASE_KEY_PATH: secrets/firebase_key.json
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: python main_linkedin.py
+
+      - name: Upload do log (sempre, mesmo em falha)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-linkedin-log
+          path: scraper.log
+          retention-days: 14
