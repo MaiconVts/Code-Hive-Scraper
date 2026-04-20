@@ -1,4 +1,4 @@
-# Code Hive — Plano de Testes Automatizados
+﻿# MyOrbita — Plano de Testes Automatizados
 
 > Documento vivo que mapeia todos os testes planejados, implementados e pendentes do projeto.
 
@@ -18,7 +18,7 @@
 ## Estrutura de Diretórios
 
 ```
-Code-Hive-Scraper/
+MyOrbita-Scraper/
 ├── tests/                          # Testes do backend (pytest)
 │   ├── __init__.py
 │   ├── conftest.py                 # Fixtures compartilhadas
@@ -38,7 +38,7 @@ Code-Hive-Scraper/
 │       ├── test_json_malformado.py # API retorna lixo → não crashar
 │       └── test_timeout.py         # Request travado → timeout funciona
 │
-├── code-hive-web/
+├── myorbita-web/
 │   ├── src/
 │   │   └── __tests__/              # Testes do frontend (vitest)
 │   │       ├── unit/
@@ -415,16 +415,16 @@ pytest tests/unit/ -v
 pytest tests/ --cov=scrapers --cov-report=html
 
 # Frontend — unitários
-cd code-hive-web && npx vitest run
+cd myorbita-web && npx vitest run
 
 # Frontend — E2E
-cd code-hive-web && npx playwright test
+cd myorbita-web && npx playwright test
 
 # Frontend — E2E com UI
-cd code-hive-web && npx playwright test --ui
+cd myorbita-web && npx playwright test --ui
 
 # Tudo junto (CI)
-pytest tests/ -v && cd code-hive-web && npx vitest run && npx playwright test
+pytest tests/ -v && cd myorbita-web && npx vitest run && npx playwright test
 ```
 
 ### GitHub Actions (futuro)
@@ -436,7 +436,7 @@ pytest tests/ -v && cd code-hive-web && npx vitest run && npx playwright test
 
 - name: Rodar testes frontend
   run: |
-    cd code-hive-web
+    cd myorbita-web
     npm ci
     npx vitest run
     npx playwright install --with-deps

@@ -1,4 +1,4 @@
-# scrapers/linkedin_scraper.py
+﻿# scrapers/linkedin_scraper.py
 """
 Scraper LinkedIn — Blindagem Anti-Detecção Nível Máximo.
 
@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 # Constantes
 # ---------------------------------------------------------------------------
 
-# Mapeamento de modalidade LinkedIn → padrão frontend Code Hive.
+# Mapeamento de modalidade LinkedIn → padrão frontend MyOrbita.
 # Usado pela inferência via localização (fallback quando filtro f_WT não se aplica).
 MODALIDADE_MAP = {
     'remote': 'Remoto',
@@ -465,7 +465,7 @@ class LinkedinScraper(BaseScraper):
 
     def _normalizar_vaga(self, vaga_raw: dict, modalidade_explicita: str = None) -> dict:
         """
-        Ponto único de conversão: dict bruto do parser → formato padronizado Code Hive.
+        Ponto único de conversão: dict bruto do parser → formato padronizado MyOrbita.
 
         Args:
             vaga_raw: dict com campos extraídos do HTML

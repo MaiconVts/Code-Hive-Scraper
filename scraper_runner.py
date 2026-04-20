@@ -1,4 +1,4 @@
-"""
+﻿"""
 scraper_runner.py — Orquestração compartilhada entre todas as plataformas.
 
 Responsabilidade Única: coordenar o fluxo de execução de um scraper qualquer.
@@ -285,7 +285,7 @@ def executar(scraper: ScraperProtocol, plataforma: str, categorias: dict):
     configurar_logging()
 
     logger.info("=" * 60)
-    logger.info(f"INICIANDO CODE HIVE SCRAPER — PLATAFORMA: {plataforma.upper()}")
+    logger.info(f"INICIANDO MYORBITA SCRAPER — PLATAFORMA: {plataforma.upper()}")
     logger.info("=" * 60)
 
     inicializar_firebase()

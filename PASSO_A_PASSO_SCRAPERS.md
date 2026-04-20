@@ -1,6 +1,6 @@
-# Passo a Passo — Scrapers MyOrbita (Gupy + LinkedIn)
+﻿# Passo a Passo — Scrapers MyOrbita (Gupy + LinkedIn)
 
-**Projeto:** Code Hive / MyOrbita — Agregador de Vagas (Tech + Jurídico)
+**Projeto:** MyOrbita / MyOrbita — Agregador de Vagas (Tech + Jurídico)
 **Stack:** Python + Firebase Realtime DB | React + TypeScript + Vite
 **Deadline geral:** 20/06/2026
 **Tempo estimado total:** 23–34 horas (~3–5 dias focados)

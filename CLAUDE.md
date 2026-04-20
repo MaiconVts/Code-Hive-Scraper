@@ -1,4 +1,4 @@
-# CLAUDE.md — Code Hive
+﻿# CLAUDE.md — MyOrbita
 
 ## PAPEL E COMPORTAMENTO
 
@@ -39,7 +39,7 @@ Atue como **Tech Lead e Mentor Especialista em Engenharia de Software**. Seu obj
 
 ## VISÃO DO PRODUTO
 
-O **Code Hive** é um agregador inteligente de vagas profissionais, desenvolvido como projeto solo de uso pessoal e portfólio técnico.
+O **MyOrbita** é um agregador inteligente de vagas profissionais, desenvolvido como projeto solo de uso pessoal e portfólio técnico.
 
 ### Problema
 Buscar vagas em múltiplas plataformas manualmente é ineficiente. As plataformas disponíveis não atendem nichos específicos de forma consolidada.
@@ -101,14 +101,14 @@ Web App    Mobile App
 ## ESTRUTURA DO PROJETO
 
 ```
-Code-Hive-Scraper/
+MyOrbita-Scraper/
 ├── .claude/
 │   └── CLAUDE.md                   # Este arquivo
 ├── .github/
 │   └── workflows/
 │       └── scraper.yml             # GitHub Actions — execução diária
-├── code-hive-web/                  # Aplicação web React + Vite (Sprint 2)
-├── code-hive-mobile/               # React Native + Expo (Sprint 8 — bloqueado)
+├── myorbita-web/                  # Aplicação web React + Vite (Sprint 2)
+├── myorbita-mobile/               # React Native + Expo (Sprint 8 — bloqueado)
 ├── scrapers/
 │   ├── __init__.py
 │   ├── base_scraper.py             # Contrato abstrato (Template Method)
@@ -158,7 +158,7 @@ Code-Hive-Scraper/
 
 ```env
 FIREBASE_KEY_PATH=secrets/sua-chave-firebase.json
-FIREBASE_DB_URL=https://code-hive-vagas-default-rtdb.firebaseio.com
+FIREBASE_DB_URL=https://my-orbit-prod-default-rtdb.firebaseio.com
 ```
 
 ---
@@ -179,7 +179,7 @@ FIREBASE_DB_URL=https://code-hive-vagas-default-rtdb.firebaseio.com
 - Credenciais protegidas via GitHub Secrets + .gitignore
 
 ### 🔵 Em andamento — Sprint 2 (Web)
-- [x] Criar projeto React + Vite em `code-hive-web/`
+- [x] Criar projeto React + Vite em `myorbita-web/`
 - [x] Configurar Firebase SDK no frontend
 - [x] Validar consumo de dados reais do Firebase
 

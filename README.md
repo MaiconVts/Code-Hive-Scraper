@@ -1,4 +1,4 @@
-# Code Hive — Agregador Inteligente de Vagas
+﻿# MyOrbita — Agregador Inteligente de Vagas
 
 > Projeto full stack multiplataforma de uso pessoal e portfólio. Todos os direitos reservados. Uso comercial proibido sem autorização expressa do autor.
 
@@ -22,7 +22,7 @@
 
 ## 1. Escopo e Visão do Produto
 
-O **Code Hive** é um agregador inteligente de vagas profissionais, desenvolvido como projeto solo de uso pessoal e portfólio técnico.
+O **MyOrbita** é um agregador inteligente de vagas profissionais, desenvolvido como projeto solo de uso pessoal e portfólio técnico.
 
 ### Problema
 Buscar vagas em múltiplas plataformas manualmente é ineficiente e repetitivo. As plataformas disponíveis não atendem nichos específicos de forma consolidada.
@@ -212,7 +212,7 @@ O Firebase atua como camada de persistência em nuvem. O scraper utiliza o SDK A
 
 **Frontend (React):**
 - As credenciais do Firebase Web SDK são carregadas via variáveis de ambiente do Vite (`import.meta.env.VITE_*`).
-- O arquivo `code-hive-web/.env` é ignorado pelo `.gitignore`.
+- O arquivo `myorbita-web/.env` é ignorado pelo `.gitignore`.
 - As chaves do Firebase Web SDK são públicas por design (controle de acesso via Security Rules).
 
 ### Logging e Monitoramento
@@ -226,7 +226,7 @@ O Firebase atua como camada de persistência em nuvem. O scraper utiliza o SDK A
 secrets/
 *adminsdk*.json
 .env
-code-hive-web/.env
+myorbita-web/.env
 scraper.log
 ```
 
@@ -285,12 +285,12 @@ FIREBASE_DB_URL=https://seu-projeto-default-rtdb.firebaseio.com
 - Gerenciador de pacotes `npm`
 
 ```bash
-cd code-hive-web
+cd myorbita-web
 npm install
 ```
 
 Configure o ambiente:
-1. Crie o arquivo `code-hive-web/.env`:
+1. Crie o arquivo `myorbita-web/.env`:
 
 ```env
 VITE_FIREBASE_API_KEY=sua-api-key
@@ -318,13 +318,13 @@ O GitHub Actions executa o script automaticamente todo dia às 03:24 (horário d
 
 ### Frontend — Desenvolvimento
 ```bash
-cd code-hive-web
+cd myorbita-web
 npm run dev
 ```
 
 ### Frontend — Build de produção
 ```bash
-cd code-hive-web
+cd myorbita-web
 npm run build
 ```
 
@@ -333,13 +333,13 @@ npm run build
 ## 12. Estrutura do Projeto
 
 ```
-Code-Hive-Scraper/
+MyOrbita-Scraper/
 ├── .claude/
 │   └── CLAUDE.md                   # Contexto para assistente IA
 ├── .github/
 │   └── workflows/
 │       └── scraper.yml             # GitHub Actions — execução diária + logs
-├── code-hive-web/                  # Aplicação web React + Vite + TypeScript
+├── myorbita-web/                  # Aplicação web React + Vite + TypeScript
 │   ├── src/
 │   │   ├── components/             # Header, VagaDetalhe, PageTransition, PlanetarySystem
 │   │   ├── constants/              # colors.ts, typography.ts, routes.ts
@@ -349,7 +349,7 @@ Code-Hive-Scraper/
 │   │   ├── stores/                 # transitionStore (Zustand)
 │   │   └── types/                  # IVaga.ts
 │   └── .env                        # Variáveis Firebase Web (não versionado)
-├── code-hive-mobile/               # React Native + Expo (planejado)
+├── myorbita-mobile/               # React Native + Expo (planejado)
 ├── scrapers/
 │   ├── __init__.py
 │   ├── base_scraper.py             # Contrato abstrato + normalização + retry seletivo
@@ -370,4 +370,4 @@ Code-Hive-Scraper/
 
 ---
 
-*Code Hive © 2026 — Todos os direitos reservados. Uso comercial proibido sem autorização expressa do autor.*
+*MyOrbita © 2026 — Todos os direitos reservados. Uso comercial proibido sem autorização expressa do autor.*
