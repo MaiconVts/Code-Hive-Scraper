@@ -15,8 +15,7 @@ jobs:
 
     # LinkedIn é scraping pesado com delays anti-ban (3-6s entre requests,
     # pausas longas a cada 50 vagas, cooldown entre keywords).
-    # 120min cobre pior caso + margem para retries de circuit breaker.
-    timeout-minutes: 120
+    # 120min cobre pior caso + margem para retries de circuit breaker.(retirado para testes iniciais, a ideia é rodar o scraper sem timeout e monitorar o tempo gasto para definir um timeout mais adequado)
 
     steps:
       - name: Checkout do repositório
