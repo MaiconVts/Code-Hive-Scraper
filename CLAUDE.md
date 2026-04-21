@@ -255,7 +255,7 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [x] FASE 5.5 — Filtros (modalidade, data, estado, contrato, PCD, busca textual)
 - [ ] FASE 5.6 — Refatorar `services/api.ts` para buscar das 4 rotas novas (Gupy + LinkedIn) e mergear
 - [ ] FASE 5.7 — Atualizar `constants/routes.ts` com as 4 rotas
-- [ ] FASE 5.8 — Badge de origem nos cards (Gupy azul claro / LinkedIn azul escuro)
+- [ ] FASE 5.8 — Badge de origem nos cards (Gupy (e sua cor)) / LinkedIn (cor do linkedin)
 - [ ] FASE 5.9 — Filtro por origem (toggle Todas / Gupy / LinkedIn)
 
 ### 📋 A fazer — Sprint 6 (Qualidade)
