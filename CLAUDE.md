@@ -247,16 +247,16 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [x] FASE 4.1 — Prototipar telas
 - [x] FASE 4.2 — Validar fluxo de navegação
 
-### 🔵 Em andamento — Sprint 5 (Telas Web)
+### ✅ Concluído — Sprint 5 (Telas Web)
 - [x] FASE 5.1 — Conectar Firebase ao projeto web
 - [x] FASE 5.2 — Página de vagas Dev
 - [x] FASE 5.3 — Página de vagas Jurídico
 - [x] FASE 5.4 — Navegação React Router + página de detalhe
 - [x] FASE 5.5 — Filtros (modalidade, data, estado, contrato, PCD, busca textual)
-- [ ] FASE 5.6 — Refatorar `services/api.ts` para buscar das 4 rotas novas (Gupy + LinkedIn) e mergear
-- [ ] FASE 5.7 — Atualizar `constants/routes.ts` com as 4 rotas
-- [ ] FASE 5.8 — Badge de origem nos cards (Gupy (e sua cor)) / LinkedIn (cor do linkedin)
-- [ ] FASE 5.9 — Filtro por origem (toggle Todas / Gupy / LinkedIn)
+- [x] FASE 5.6 — Refatorar `services/api.ts` para buscar das 4 rotas (Gupy + LinkedIn) e mergear
+- [x] FASE 5.7 — Atualizar `constants/routes.ts` com as 4 rotas
+- [x] FASE 5.8 — Badge de origem nos cards (Gupy azul claro / LinkedIn azul oficial)
+- [x] FASE 5.9 — Filtro por origem (toggle Todas / Gupy / LinkedIn)
 
 ### 📋 A fazer — Sprint 6 (Qualidade)
 - [x] FASE 6.1 — Aplicar design system completo
