@@ -6,7 +6,7 @@ Responsabilidade Única: coordenar o fluxo de execução de um scraper qualquer.
 - Inicializa Firebase
 - Carrega queries da categoria (dev/adv)
 - Executa buscas com deduplicação 3 níveis
-- Envia resultados para o Firebase incrementalmente (por keyword)
+- Checkpoint Firebase a cada 10 keywords + envio final completo
 - Imprime métricas
 
 Cada main (main_gupy, main_linkedin) importa daqui e só precisa:
@@ -111,25 +111,20 @@ def carregar_ids_firebase(rota: str) -> set:
         return set()
 
 
-def persistir_vagas_incrementalmente(vagas_novas: list, rota: str):
+def enviar_para_firebase(lista_vagas: list, rota: str):
     """
-    Persiste vagas no Firebase imediatamente após cada keyword.
-
-    Usa ref.update() em vez de ref.set() — mescla os novos registros
-    sem sobrescrever o que já foi salvo nas keywords anteriores.
-    Isso garante que um timeout no meio da execução não perde
-    o progresso já persistido.
-
-    ref.set()    → substitui o nó inteiro (comportamento anterior — perigoso)
-    ref.update() → mescla {id: vaga} no nó existente (idempotente, seguro)
+    Upload da lista de vagas para o Firebase via ref.set().
+    ref.set() substitui todos os dados na rota — intencional,
+    sempre queremos a versão mais atualizada sem acumular lixo.
+    Vagas expiradas somem automaticamente a cada execução completa.
     """
     try:
         ref = db.reference(rota)
-        vagas_dict = {vaga['id']: vaga for vaga in vagas_novas}
-        ref.update(vagas_dict)
-        logger.info(f"  💾 {len(vagas_novas)} vagas persistidas em '{rota}'.")
+        vagas_dict = {vaga['id']: vaga for vaga in lista_vagas}
+        ref.set(vagas_dict)
+        logger.info(f"[FIREBASE]: {len(lista_vagas)} vagas enviadas para '{rota}' com sucesso.")
     except Exception as e:
-        logger.error(f"[FIREBASE ERRO]: Falha ao persistir vagas em '{rota}'. Erro: {str(e)}")
+        logger.error(f"[FIREBASE ERRO]: Falha ao enviar dados. Erro: {str(e)}")
 
 
 # ============================================================
@@ -171,8 +166,8 @@ def filtrar_duplicadas(vagas: list, urls_vistas: set, ids_firebase: set) -> tupl
     """
     Deduplicação 3 níveis:
     1. URL já vista nesta execução (duplicata intra-scraping)
-    2. ID já existe no Firebase (duplicata cross-execução — descarta,
-       pois ref.update() não precisa re-enviar o que já está lá)
+    2. ID já existe no Firebase (duplicata cross-execução — ainda adiciona
+       pro ref.set() final sobrescrever com dados atualizados)
     3. Vaga genuinamente nova — adiciona
     """
     vagas_unicas = []
@@ -187,9 +182,9 @@ def filtrar_duplicadas(vagas: list, urls_vistas: set, ids_firebase: set) -> tupl
 
         if vaga['id'] in ids_firebase:
             ja_firebase += 1
-            continue  # Com update() incremental, não precisa re-enviar existentes
+            vagas_unicas.append(vaga)
+            continue
 
-        ids_firebase.add(vaga['id'])  # Registra localmente para dedup intra-execução
         vagas_unicas.append(vaga)
 
     return vagas_unicas, duplicadas, ja_firebase
@@ -198,16 +193,14 @@ def filtrar_duplicadas(vagas: list, urls_vistas: set, ids_firebase: set) -> tupl
 # ============================================================
 # LOOP PRINCIPAL DE BUSCAS
 # ============================================================
-
-    
-    def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: set, rota: str) -> dict:
-        """
+def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: set, rota: str) -> dict:
+    """
     Loop de buscas: itera palavras × modalidades, aplica dedup,
-    persiste no Firebase a cada keyword e retorna métricas.
+    faz checkpoint no Firebase a cada 10 keywords e retorna agregado.
 
-    A persistência incremental (por keyword) garante que um timeout
-    no GitHub Actions não perde o progresso já coletado — cada keyword
-    concluída é imediatamente salva via ref.update().
+    Checkpoint via ref.set() a cada 10 keywords garante que um timeout
+    no GitHub Actions não perde mais de ~10 keywords de progresso.
+    O ref.set() final em finalizar_scraping entrega o snapshot completo.
     """
     urls_vistas = set()
     todas_as_vagas = []
@@ -258,30 +251,29 @@ def filtrar_duplicadas(vagas: list, urls_vistas: set, ids_firebase: set) -> tupl
 
 
 # ============================================================
-# FINALIZAÇÃO — apenas métricas (upload já foi feito incrementalmente)
+# FINALIZAÇÃO — métricas + snapshot final completo
 # ============================================================
 def finalizar_scraping(resultados: dict, rota: str):
-    """
-    Imprime métricas da categoria.
-    O upload para o Firebase já ocorreu incrementalmente durante executar_buscas —
-    esta função não faz mais nenhum ref.set() ou ref.update().
-    """
+    """Imprime métricas da categoria e envia snapshot final para o Firebase."""
     duracao = resultados['duracao_segundos']
-    total_vagas = resultados['total_vagas_salvas']
+    total_vagas = len(resultados['vagas'])
 
     logger.info("-" * 60)
     logger.info(f"Orquestração finalizada!")
     logger.info(f"  • Combinações pesquisadas: {resultados['total_combinacoes']}")
-    logger.info(f"  • Vagas únicas salvas no Firebase: {total_vagas}")
+    logger.info(f"  • Vagas únicas coletadas: {total_vagas}")
     logger.info(f"  • Duplicadas ignoradas (intra-scraping): {resultados['total_duplicadas']}")
-    logger.info(f"  • Já existentes no Firebase (ignoradas): {resultados['total_ja_no_firebase']}")
+    logger.info(f"  • Já existentes no Firebase: {resultados['total_ja_no_firebase']}")
     logger.info(f"  • Duração: {duracao / 60:.1f} minutos ({duracao:.0f}s)")
 
     if total_vagas > 0:
         vagas_por_segundo = total_vagas / duracao if duracao > 0 else 0
+        taxa_duplicata = resultados['total_duplicadas'] / (total_vagas + resultados['total_duplicadas']) * 100 if (total_vagas + resultados['total_duplicadas']) > 0 else 0
         logger.info(f"  • Performance: {vagas_por_segundo:.1f} vagas/segundo")
+        logger.info(f"  • Taxa de duplicatas: {taxa_duplicata:.1f}%")
+        enviar_para_firebase(resultados['vagas'], rota)
     else:
-        logger.warning("Nenhuma vaga nova encontrada nesta categoria.")
+        logger.warning("Nenhuma vaga nova encontrada. Firebase não atualizado.")
 
     logger.info("=" * 60)
 
@@ -325,7 +317,6 @@ def executar(scraper: ScraperProtocol, plataforma: str, categorias: dict):
 
         ids_firebase = carregar_ids_firebase(categoria['rota'])
 
-        # rota passada para executar_buscas — persistência incremental por keyword
         resultados = executar_buscas(scraper, parametros, ids_firebase, categoria['rota'])
         finalizar_scraping(resultados, categoria['rota'])
 
