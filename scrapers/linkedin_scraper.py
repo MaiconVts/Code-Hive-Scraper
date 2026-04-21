@@ -138,7 +138,7 @@ class LinkedinScraper(BaseScraper):
     # --- Limites globais de segurança ---
     _MAX_REQUESTS_POR_EXECUCAO = 200   # Teto absoluto de requests HTTP
     _MAX_ERROS_CONSECUTIVOS = 5        # Circuit breaker: 5 erros seguidos → abort
-    _TAXA_ERRO_CRITICA = 0.10          # 10% de erro → pausa de recuperação
+    _TAXA_ERRO_CRITICA = 0.20          # 20% de erro → pausa de recuperação
 
     # --- Delays (em segundos) ---
     _DELAY_ENTRE_REQUESTS_MEDIA = 6.0   # Média do delay gaussiano entre requests
@@ -148,7 +148,7 @@ class LinkedinScraper(BaseScraper):
     _PAUSA_LONGA_A_CADA = 50            # A cada N vagas, pausa longa
     _PAUSA_LONGA_MEDIA = 45.0           # Média da pausa longa (segundos)
     _PAUSA_LONGA_DESVIO = 10.0
-    _PAUSA_RECUPERACAO = 300.0          # 5 minutos de pausa se taxa de erro alta
+    _PAUSA_RECUPERACAO = 120.0          # 2 minutos de pausa se taxa de erro alta
 
     # geoId oficial do Brasil no LinkedIn — garante que só retorna vagas brasileiras.
     # Sem ele, o LinkedIn mistura resultados globais mesmo com &location=Brasil.
