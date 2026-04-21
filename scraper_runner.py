@@ -198,8 +198,10 @@ def filtrar_duplicadas(vagas: list, urls_vistas: set, ids_firebase: set) -> tupl
 # ============================================================
 # LOOP PRINCIPAL DE BUSCAS
 # ============================================================
-def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: set, rota: str) -> dict:
-    """
+
+    
+    def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: set, rota: str) -> dict:
+        """
     Loop de buscas: itera palavras × modalidades, aplica dedup,
     persiste no Firebase a cada keyword e retorna métricas.
 
@@ -208,11 +210,12 @@ def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: se
     concluída é imediatamente salva via ref.update().
     """
     urls_vistas = set()
-    total_vagas_salvas = 0
+    todas_as_vagas = []
     total_combinacoes = 0
     total_duplicadas = 0
     total_ja_no_firebase = 0
     inicio = time.time()
+    keywords_desde_checkpoint = 0
 
     for palavra in parametros['palavras_chave']:
         for modalidade in parametros['modalidades']:
@@ -230,18 +233,23 @@ def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: se
 
             if vagas_novas:
                 logger.info(f"  ✅ {len(vagas_novas)} vagas únicas adicionadas.")
-                # Persiste imediatamente — não acumula para o final
-                persistir_vagas_incrementalmente(vagas_novas, rota)
-                total_vagas_salvas += len(vagas_novas)
+                todas_as_vagas.extend(vagas_novas)
             elif duplicadas > 0 or ja_firebase > 0:
                 logger.info(f"  ⏭️ {duplicadas} duplicadas, {ja_firebase} já no Firebase.")
             else:
                 logger.info(f"  ⚠️ Nenhuma vaga encontrada.")
 
+        # Checkpoint a cada 10 keywords (loop externo — por palavra, não por combinação)
+        keywords_desde_checkpoint += 1
+        if keywords_desde_checkpoint >= 10:
+            logger.info(f"  💾 Checkpoint: {len(todas_as_vagas)} vagas salvas até agora...")
+            enviar_para_firebase(todas_as_vagas, rota)
+            keywords_desde_checkpoint = 0
+
     duracao = time.time() - inicio
 
     return {
-        'total_vagas_salvas': total_vagas_salvas,
+        'vagas': todas_as_vagas,
         'total_combinacoes': total_combinacoes,
         'total_duplicadas': total_duplicadas,
         'total_ja_no_firebase': total_ja_no_firebase,
