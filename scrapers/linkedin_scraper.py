@@ -136,7 +136,7 @@ class LinkedinScraper(BaseScraper):
     _MAX_PAGINAS = 4            # Máximo 4 páginas por keyword (100 vagas)
 
     # --- Limites globais de segurança ---
-    _MAX_REQUESTS_POR_EXECUCAO = 200   # Teto absoluto de requests HTTP
+    _MAX_REQUESTS_POR_EXECUCAO = 2000  # Teto absoluto de requests HTTP
     _MAX_ERROS_CONSECUTIVOS = 5        # Circuit breaker: 5 erros seguidos → abort
     _TAXA_ERRO_CRITICA = 0.20          # 20% de erro → pausa de recuperação
 
