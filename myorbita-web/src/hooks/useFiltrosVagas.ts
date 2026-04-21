@@ -81,7 +81,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       const termosBusca = normalizarTexto(busca).split(/\s+/);
       resultado = resultado.filter((vaga) => {
         const textoVaga = normalizarTexto(
-          `${vaga.titulo} ${vaga.empresa} ${vaga.city || ""} ${vaga.state || ""} ${vaga.tipo_contrato || ""}`
+          `${vaga.titulo || ""} ${vaga.empresa || ""} ${vaga.city || ""} ${vaga.state || ""} ${vaga.tipo_contrato || ""} ${vaga.modalidade || ""}`
         );
         return termosBusca.every((termo) => textoVaga.includes(termo));
       });
@@ -94,19 +94,19 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       );
     }
 
-    // 3. Filtro de nível hierárquico
+    // 3. Filtro de nível hierárquico (usa word boundaries para evitar falsos positivos)
     if (filtroNivel !== "todos") {
       resultado = resultado.filter((v) => {
         const titulo = normalizarTexto(v.titulo);
         switch (filtroNivel) {
           case "estagio":
-            return titulo.includes("estagio") || titulo.includes("intern") || titulo.includes("aprendiz");
+            return /\b(estagio|intern|aprendiz|trainee)\b/.test(titulo);
           case "junior":
-            return titulo.includes("junior") || titulo.includes("jr") || titulo.includes("i ");
+            return /\b(junior|jr)\b/.test(titulo);
           case "pleno":
-            return titulo.includes("pleno") || titulo.includes("mid") || titulo.includes("ii ");
+            return /\b(pleno|mid|middle)\b/.test(titulo);
           case "senior":
-            return titulo.includes("senior") || titulo.includes("sr") || titulo.includes("iii ");
+            return /\b(senior|sr)\b/.test(titulo);
           default:
             return true;
         }
@@ -135,9 +135,13 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     }
 
     // 8. Ordenação por data de publicação
+    // Vagas sem data vão sempre para o fim, independente da ordenação.
     resultado.sort((a, b) => {
-      const dA = new Date(a.data_publicacao || 0).getTime();
-      const dB = new Date(b.data_publicacao || 0).getTime();
+      const dA = a.data_publicacao ? new Date(a.data_publicacao).getTime() : null;
+      const dB = b.data_publicacao ? new Date(b.data_publicacao).getTime() : null;
+      if (dA === null && dB === null) return 0;
+      if (dA === null) return 1;
+      if (dB === null) return -1;
       return ordenacao === "recente" ? dB - dA : dA - dB;
     });
 
