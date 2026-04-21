@@ -227,6 +227,8 @@ def executar_buscas(scraper: ScraperProtocol, parametros: dict, ids_firebase: se
             if vagas_novas:
                 logger.info(f"  ✅ {len(vagas_novas)} vagas únicas adicionadas.")
                 todas_as_vagas.extend(vagas_novas)
+                logger.info(f"  💾 Snapshot: {len(todas_as_vagas)} vagas salvas no Firebase...")
+                enviar_para_firebase(todas_as_vagas, rota)
             elif duplicadas > 0 or ja_firebase > 0:
                 logger.info(f"  ⏭️ {duplicadas} duplicadas, {ja_firebase} já no Firebase.")
             else:
