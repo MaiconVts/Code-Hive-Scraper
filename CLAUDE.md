@@ -1,4 +1,4 @@
-﻿# CLAUDE.md — MyOrbita
+# CLAUDE.md — MyOrbita
 
 ## PAPEL E COMPORTAMENTO
 
@@ -106,7 +106,7 @@ GitHub Actions (workflows independentes)
 - **Template Method** — `BaseScraper` define contrato abstrato obrigatório (`buscar_vagas`, `padronizar_vaga`, `gerar_id_deterministico`)
 - **Strategy Pattern** — Cada `main_*.py` instancia seu scraper específico, permitindo workflows isolados
 - **DRY via Composition** — `scraper_runner.py` concentra lógica de orquestração compartilhada (logging, Firebase, dedup, métricas)
-- **Atomic Write** — Substituído por escrita direta no Firebase via `ref.set()` (Firebase é fonte única de verdade)
+- **Checkpoint Incremental** — `scraper_runner.py` persiste snapshot completo no Firebase após cada combinação `palavra × modalidade` com vagas novas, via `ref.set()`. Garante que timeout ou crash no GitHub Actions não perde progresso coletado. O `set()` final em `finalizar_scraping` entrega o snapshot canônico (vagas expiradas saem naturalmente a cada execução completa)
 - **Exponential Backoff + Jitter** — Resiliência contra rate limiting (HTTP 429)
 - **Hashing Determinístico** — `hashlib.md5(url)` gera IDs idempotentes por vaga
 
@@ -114,13 +114,13 @@ GitHub Actions (workflows independentes)
 1. **TLS Fingerprint** — `curl_cffi` com `impersonate="chrome"` replica handshake JA3/HTTP2 de Chrome real
 2. **Session Persistente** — mantém cookies entre requests
 3. **Warm-up 3 etapas** — Google → Homepage → /jobs/ antes de buscar
-4. **Headers Sec-Fetch-*** — que navegadores modernos enviam e bots não
+4. **Headers Sec-Fetch-\*** — que navegadores modernos enviam e bots não
 5. **Rotação User-Agent** — 5 variações de Chrome/Firefox/Safari
 6. **Delays Gaussianos** — `random.gauss()` com jitter ±25% (humanos têm bell curve, não flat)
 7. **Cooldown Keywords** — pausa entre palavras-chave diferentes
 8. **Detecção Tríplice** — authwall + captcha + response size anomaly
-9. **Circuit Breaker** — 5 erros consecutivos → abort automático
-10. **Teto Global** — 200 requests máximos por execução
+9. **Circuit Breaker** — 5 erros consecutivos → abort automático. Taxa de erro > 20% → pausa de recuperação de 120s. Threshold calibrado empiricamente: 10% era agressivo demais (gerava pausas desnecessárias em erros que se recuperavam sozinhos na próxima keyword)
+10. **Teto Global** — 2000 requests máximos por execução. Valor calibrado como margem de segurança contra bugs/loops, não como limitador de execução normal. Com 229 keywords × 3 modalidades × 2 páginas médias ≈ 1377 requests em execução saudável, 2000 dá folga confortável
 11. **Referer Chain** — cada request tem referer da página anterior
 
 ### Filtros LinkedIn Validados
@@ -261,8 +261,8 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 ### 📋 A fazer — Sprint 6 (Qualidade)
 - [x] FASE 6.1 — Aplicar design system completo
 - [x] FASE 6.2 — Validar responsividade
-- [ ] FASE 6.3 — Cache local no frontend (AsyncStorage/localStorage, TTL 1h) para reduzir reads no Firebase
-- [ ] FASE 6.4 — Pull-to-refresh para invalidar cache manualmente
+- [x] FASE 6.3 — Cache local no frontend (localStorage, TTL 1h) via `useCacheVagas` — isolado por rota, resiliente a erros, timestamp correto em hit parcial
+- [x] FASE 6.4 — Pull-to-refresh via `recarregar()` que invalida cache e re-fetcha do Firebase
 - [ ] FASE 6.5 — Testar em múltiplos navegadores (cross-browser)
 
 ### 📋 A fazer — Sprint 7 (Deploy)
@@ -320,3 +320,27 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 ### Cores de Badge por Origem
 - Gupy: `#4FC3F7` (azul claro)
 - LinkedIn: `#0077B5` (azul escuro oficial LinkedIn)
+
+---
+
+## LIÇÕES APRENDIDAS
+
+### Limites Anti-Ban vs Cobertura de Execução
+
+Teto global de requests deve ser **margem de segurança contra bugs/loops**, não limitador de execução normal. A proteção real contra ban é o circuit breaker + detecção tríplice de bloqueio (authwall/captcha/response size) — não o teto.
+
+**Cálculo da margem:** `(keywords × modalidades × páginas_médias) + warm-up`. Para LinkedIn atual: `(75 + 154) × 3 × 2 + 3 ≈ 1377`. Arredondar para cima com folga generosa (2000).
+
+**Sintoma de teto mal calibrado:** log mostra "Teto global atingido. Parando graciosamente." disparando dezenas de vezes em categorias inteiras não pesquisadas, sem que nenhum sinal real de bloqueio tenha ocorrido. Foi o que matou uma execução inteira da categoria ADV na primeira run.
+
+### Checkpoint vs Save Final
+
+Acumular tudo em memória e salvar só no fim é fatal para execuções longas (2h+). Mas salvar a cada keyword via `ref.update()` quebra a semântica de snapshot (vagas expiradas não saem). Solução: `ref.set()` com snapshot completo acumulado após **cada combinação com vagas novas**. Custo por save é desprezível (~2s) comparado ao tempo por combinação (~2min).
+
+### Filtros de Nível com `includes` vs Word Boundaries
+
+`titulo.includes("i ")` para detectar "I" romano em júnior parece esperto mas casa em qualquer palavra terminada em "i" seguida de espaço (`"api "`, `"ui "`). Sempre usar `\b...\b` em regex para matches de palavra inteira.
+
+### Cache por Rota vs Cache por Origem
+
+Cache no frontend isolado **por rota Firebase**, nunca por campo `origem`. Duas rotas diferentes (`/vagas/dev/gupy` e `/vagas/adv/gupy`) compartilham o mesmo campo `origem = "Gupy"` — reagrupar pela origem contamina o cache entre categorias.
