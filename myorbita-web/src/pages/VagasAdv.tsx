@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Search,
   ChevronLeft,
@@ -7,13 +7,17 @@ import {
   GraduationCap,
   Briefcase,
   Accessibility,
+  X,
+  SlidersHorizontal,
+  Layers,
+  RefreshCw,
 } from "lucide-react";
-import { getVagas } from "../services/api";
 import type { IVaga } from "../types/IVaga";
 import { ROUTES } from "../constants/routes";
 import VagaDetalhe from "../components/VagaDetalhe";
 import PageTransition from "../components/PageTransition";
 import { useFiltrosVagas } from "../hooks/useFiltrosVagas";
+import { useCacheVagas } from "../hooks/useCacheVagas";
 
 const modalidadeCor: Record<string, string> = {
   Remoto: "#4FC3F7",
@@ -32,13 +36,17 @@ const contratoCor: Record<string, string> = {
   "Banco de Talentos": "#94A3B8",
 };
 
-// Mapa de cores por plataforma de origem.
-// Cada plataforma tem cor única para identificação visual rápida.
-// Fallback cinza (#94A3B8) para origens não mapeadas (defensive coding).
 const origemCor: Record<string, string> = {
-  Gupy: "#4FC3F7",     // Azul claro — identidade da Gupy
-  LinkedIn: "#0077B5", // Azul oficial LinkedIn
+  Gupy: "#4FC3F7",
+  LinkedIn: "#0077B5",
 };
+
+const PLATAFORMAS_CANONICAS = ["Gupy", "LinkedIn"] as const;
+
+const ROTAS_ADV = [
+  ROUTES.FIREBASE_VAGAS_ADV_GUPY,
+  ROUTES.FIREBASE_VAGAS_ADV_LINKEDIN,
+];
 
 function formatarData(iso: string): string {
   if (!iso) return "—";
@@ -53,10 +61,21 @@ function corPrazo(prazoIso: string): { cor: string; texto: string } {
   const hoje = new Date();
   const prazo = new Date(prazoIso);
   const dias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-
   if (dias < 0) return { cor: "#F87171", texto: "expirada" };
   if (dias <= 7) return { cor: "#FFB703", texto: `até ${formatarData(prazoIso)}` };
   return { cor: "#34D399", texto: `até ${formatarData(prazoIso)}` };
+}
+
+function formatarTempoRelativo(timestamp: number | null): string {
+  if (!timestamp) return "";
+  const diffMs = Date.now() - timestamp;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "agora mesmo";
+  if (diffMin < 60) return `há ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `há ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  return `há ${diffD}d`;
 }
 
 const selectBase: React.CSSProperties = {
@@ -66,9 +85,9 @@ const selectBase: React.CSSProperties = {
 };
 
 export default function VagasAdv() {
-  const [vagasRaw, setVagasRaw] = useState<IVaga[]>([]);
-  const [carregando, setCarregando] = useState(true);
   const [vagaSelecionada, setVagaSelecionada] = useState<IVaga | null>(null);
+
+  const { vagas: vagasRaw, carregando, atualizando, atualizadoEm, recarregar } = useCacheVagas(ROTAS_ADV);
 
   const {
     busca, setBusca,
@@ -84,46 +103,63 @@ export default function VagasAdv() {
     origensDisponiveis,
     paginaAtual, setPaginaAtual,
     vagasFiltradas, vagasPagina, totalPaginas, paginasVisiveis,
+    filtrosAtivos, totalFiltrosAtivos, limparFiltros,
   } = useFiltrosVagas(vagasRaw);
-
-  useEffect(() => {
-    (async () => {
-      setCarregando(true);
-      const data = await getVagas([
-        ROUTES.FIREBASE_VAGAS_ADV_GUPY,
-        ROUTES.FIREBASE_VAGAS_ADV_LINKEDIN,
-      ]);
-      setVagasRaw(data);
-      setCarregando(false);
-    })();
-  }, []);
 
   return (
     <PageTransition>
       <style>{`
         .filtros-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 12px;
           width: 100%;
         }
-        @media (max-width: 768px) {
-          .filtros-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
+        @media (max-width: 900px) {
+          .filtros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 480px) {
-          .filtros-grid {
-            grid-template-columns: 1fr;
+          .filtros-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        .linha-busca {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          min-width: 0;
+        }
+        @media (max-width: 900px) {
+          .linha-busca {
+            flex-direction: column;
+            align-items: stretch;
           }
+        }
+
+        .toggles-modalidade {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .icon-spinning {
+          animation: spin 1s linear infinite;
         }
       `}</style>
 
       <div
-        className="min-h-screen w-full flex flex-col items-center pb-16 px-6 lg:px-8 overflow-x-hidden"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", marginTop: '64px' }}
+        className="min-h-screen w-full flex flex-col items-center pb-16 px-4 sm:px-6 lg:px-8"
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          marginTop: '64px',
+          overflowX: "hidden",
+        }}
       >
-        <div className="w-[92%] max-w-[1200px] flex flex-col gap-10">
+        <div className="w-full max-w-[1200px] flex flex-col gap-10">
           <div className="h-0.1" />
 
           {/* Hero */}
@@ -147,17 +183,75 @@ export default function VagasAdv() {
 
           {/* Barra de Filtros */}
           <div
-            className="flex flex-col gap-4 px-6 py-5 w-full"
+            className="flex flex-col w-full"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.09)",
               borderRadius: "14px",
               backdropFilter: "blur(12px)",
+              padding: "20px",
+              gap: "16px",
+              minWidth: 0,
             }}
           >
-            {/* Linha 1: Busca + Modalidade + Ordenação */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full">
-              <div className="relative flex-1 flex items-center">
+            {/* Cabeçalho: título + contador + atualizar + limpar */}
+            <div className="flex items-center justify-between gap-3 flex-wrap w-full">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                <SlidersHorizontal size={16} color="#A0AEC0" />
+                <span className="text-[13px] text-[#A0AEC0] font-medium uppercase tracking-wider">
+                  Filtros
+                </span>
+                {totalFiltrosAtivos > 0 && (
+                  <span
+                    className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                    style={{
+                      background: "rgba(255,183,3,0.15)",
+                      color: "#FFB703",
+                      border: "1px solid rgba(255,183,3,0.3)",
+                    }}
+                  >
+                    {totalFiltrosAtivos} {totalFiltrosAtivos === 1 ? "ativo" : "ativos"}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                {!carregando && (
+                  <div className="flex items-center gap-2">
+                    {atualizadoEm && (
+                      <span className="text-[11px] text-[#6b7280]">
+                        Atualizado {formatarTempoRelativo(atualizadoEm)}
+                      </span>
+                    )}
+                    <button
+                      onClick={recarregar}
+                      disabled={atualizando}
+                      className="flex items-center gap-1.5 text-[12px] text-[#A0AEC0] hover:text-white transition-colors disabled:opacity-50"
+                      style={{ fontWeight: 500, cursor: atualizando ? "wait" : "pointer" }}
+                      title="Buscar vagas atualizadas no Firebase"
+                    >
+                      <RefreshCw size={14} className={atualizando ? "icon-spinning" : ""} />
+                      Atualizar
+                    </button>
+                  </div>
+                )}
+
+                {totalFiltrosAtivos > 0 && (
+                  <button
+                    onClick={limparFiltros}
+                    className="flex items-center gap-1.5 text-[12px] text-[#A0AEC0] hover:text-white transition-colors shrink-0"
+                    style={{ fontWeight: 500 }}
+                  >
+                    <X size={14} />
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Linha: Busca + Modalidade + Ordenação */}
+            <div className="linha-busca">
+              <div className="relative flex items-center flex-1" style={{ minWidth: 0 }}>
                 <Search className="absolute left-4" size={16} color="#FFB703" style={{ pointerEvents: "none" }} />
                 <input
                   type="text"
@@ -171,6 +265,7 @@ export default function VagasAdv() {
                     borderRadius: "10px",
                     paddingLeft: "42px",
                     paddingRight: "16px",
+                    minWidth: 0,
                   }}
                   onFocus={(e) => (e.currentTarget.style.border = "1px solid rgba(255,183,3,0.5)")}
                   onBlur={(e) => (e.currentTarget.style.border = "1px solid rgba(255,255,255,0.09)")}
@@ -178,7 +273,7 @@ export default function VagasAdv() {
               </div>
 
               <div
-                className="flex items-center gap-1 p-1.5 rounded-[12px] shrink-0"
+                className="toggles-modalidade p-1.5 rounded-[12px] shrink-0"
                 style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)" }}
               >
                 {["Remoto", "Híbrido", "Presencial"].map((f) => {
@@ -187,7 +282,7 @@ export default function VagasAdv() {
                     <button
                       key={f}
                       onClick={() => setFiltroModalidade(isActive ? null : f)}
-                      className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
+                      className="px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
                       style={{
                         background: isActive ? "#FFB703" : "transparent",
                         color: isActive ? "#050015" : "#A0AEC0",
@@ -211,15 +306,78 @@ export default function VagasAdv() {
               </select>
             </div>
 
-            {/* Linha 2: Filtros avançados */}
+            {/* Linha destacada: Plataforma — sempre visível */}
+            <div
+              className="flex flex-col gap-2 w-full"
+              style={{
+                background: "rgba(255,183,3,0.04)",
+                border: "1px solid rgba(255,183,3,0.12)",
+                borderRadius: "12px",
+                padding: "12px 14px",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Layers size={13} color="#FFB703" />
+                <span className="text-[11px] text-[#FFB703] font-semibold uppercase tracking-wider">
+                  Plataforma
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setFiltroOrigem("todas")}
+                  className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
+                  style={{
+                    background: filtroOrigem === "todas" ? "#FFB703" : "rgba(0,0,0,0.2)",
+                    color: filtroOrigem === "todas" ? "#050015" : "#A0AEC0",
+                    fontWeight: filtroOrigem === "todas" ? 600 : 500,
+                    border: "1px solid rgba(255,255,255,0.05)",
+                  }}
+                >
+                  Todas
+                </button>
+
+                {PLATAFORMAS_CANONICAS.map((origem) => {
+                  const disponivel = origensDisponiveis.includes(origem);
+                  const isActive = filtroOrigem === origem;
+                  const cor = origemCor[origem] ?? "#94A3B8";
+
+                  return (
+                    <button
+                      key={origem}
+                      onClick={() => disponivel && setFiltroOrigem(origem)}
+                      disabled={!disponivel}
+                      title={
+                        disponivel
+                          ? `Mostrar apenas vagas do ${origem}`
+                          : `Ainda não há vagas do ${origem} nesta categoria`
+                      }
+                      className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
+                      style={{
+                        background: isActive ? cor : "rgba(0,0,0,0.2)",
+                        color: isActive ? "#050015" : disponivel ? "#A0AEC0" : "#4a4a6a",
+                        fontWeight: isActive ? 600 : 500,
+                        border: `1px solid ${disponivel ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)"}`,
+                        cursor: disponivel ? "pointer" : "not-allowed",
+                        opacity: disponivel ? 1 : 0.45,
+                      }}
+                    >
+                      {origem}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Grid: Nível + Estado + Contrato + PCD */}
             <div className="filtros-grid">
-              <div className="relative flex items-center">
+              <div className="relative flex items-center" style={{ minWidth: 0 }}>
                 <GraduationCap className="absolute left-3 pointer-events-none" size={15} color="#A0AEC0" />
                 <select
                   value={filtroNivel}
                   onChange={(e) => setFiltroNivel(e.target.value)}
                   className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "36px", paddingRight: "16px" }}
+                  style={{ ...selectBase, paddingLeft: "36px", paddingRight: "16px", minWidth: 0 }}
                 >
                   <option value="todos" style={{ color: "#050015" }}>Qualquer Nível</option>
                   <option value="estagio" style={{ color: "#050015" }}>Estágio</option>
@@ -229,13 +387,13 @@ export default function VagasAdv() {
                 </select>
               </div>
 
-              <div className="relative flex items-center">
+              <div className="relative flex items-center" style={{ minWidth: 0 }}>
                 <MapPin className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
                 <select
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
                   className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px" }}
+                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
                 >
                   <option value="todos" style={{ color: "#050015" }}>Qualquer Estado</option>
                   {estadosDisponiveis.map((uf) => (
@@ -244,13 +402,13 @@ export default function VagasAdv() {
                 </select>
               </div>
 
-              <div className="relative flex items-center">
+              <div className="relative flex items-center" style={{ minWidth: 0 }}>
                 <Briefcase className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
                 <select
                   value={filtroContrato}
                   onChange={(e) => setFiltroContrato(e.target.value)}
                   className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px" }}
+                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
                 >
                   <option value="todos" style={{ color: "#050015" }}>Qualquer Contrato</option>
                   {contratosDisponiveis.map((tipo) => (
@@ -267,6 +425,7 @@ export default function VagasAdv() {
                   border: filtroPcd ? "1px solid rgba(255,183,3,0.4)" : "1px solid rgba(255,255,255,0.09)",
                   color: filtroPcd ? "#FFB703" : "#A0AEC0",
                   fontWeight: filtroPcd ? 600 : 400,
+                  minWidth: 0,
                 }}
               >
                 <Accessibility size={14} />
@@ -274,47 +433,32 @@ export default function VagasAdv() {
               </button>
             </div>
 
-            {/* Linha 3: Toggle de origem (Gupy / LinkedIn) — só aparece se há mais de uma fonte */}
-            {origensDisponiveis.length > 1 && (
+            {/* Chips de filtros ativos */}
+            {totalFiltrosAtivos > 0 && (
               <div
-                className="flex items-center gap-1 p-1.5 rounded-[12px] self-start"
-                style={{
-                  background: "rgba(0,0,0,0.2)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                }}
+                className="flex flex-wrap gap-2 pt-3 w-full"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
               >
-                {/* Botão "Todas" — sempre primeiro */}
-                <button
-                  onClick={() => setFiltroOrigem("todas")}
-                  className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
-                  style={{
-                    background: filtroOrigem === "todas" ? "#FFB703" : "transparent",
-                    color: filtroOrigem === "todas" ? "#050015" : "#A0AEC0",
-                    fontWeight: filtroOrigem === "todas" ? 600 : 500,
-                  }}
-                >
-                  Todas
-                </button>
-
-                {/* Um botão por origem disponível */}
-                {origensDisponiveis.map((origem) => {
-                  const isActive = filtroOrigem === origem;
-                  const cor = origemCor[origem] ?? "#94A3B8";
-                  return (
-                    <button
-                      key={origem}
-                      onClick={() => setFiltroOrigem(origem)}
-                      className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
-                      style={{
-                        background: isActive ? cor : "transparent",
-                        color: isActive ? "#050015" : "#A0AEC0",
-                        fontWeight: isActive ? 600 : 500,
-                      }}
-                    >
-                      {origem}
-                    </button>
-                  );
-                })}
+                {filtrosAtivos.map((filtro, idx) => (
+                  <button
+                    key={idx}
+                    onClick={filtro.limpar}
+                    className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all duration-200"
+                    style={{
+                      background: "rgba(255,183,3,0.1)",
+                      color: "#FFB703",
+                      border: "1px solid rgba(255,183,3,0.25)",
+                      fontWeight: 500,
+                      maxWidth: "100%",
+                    }}
+                    title="Clique para remover este filtro"
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {filtro.nome}
+                    </span>
+                    <X size={11} style={{ flexShrink: 0 }} />
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -326,11 +470,51 @@ export default function VagasAdv() {
             </div>
           )}
 
-          {/* Vazio */}
+          {/* Empty state */}
           {!carregando && vagasFiltradas.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 w-full">
-              <p className="text-white text-[17px] font-semibold">Nenhuma vaga atende aos filtros</p>
-              <p className="text-[#A0AEC0] text-[13px]">Tente remover algumas palavras-chave ou alterar a modalidade.</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-4 w-full px-4 text-center">
+              <p className="text-white text-[17px] font-semibold">
+                Nenhuma vaga atende aos filtros
+              </p>
+
+              {totalFiltrosAtivos > 0 ? (
+                <>
+                  <p className="text-[#A0AEC0] text-[13px] max-w-md">
+                    Você tem {totalFiltrosAtivos} {totalFiltrosAtivos === 1 ? "filtro ativo" : "filtros ativos"}.
+                    Tente remover {totalFiltrosAtivos === 1 ? "ele" : "alguns"} para ver mais resultados.
+                  </p>
+
+                  <div className="flex flex-wrap justify-center gap-2 mt-2 max-w-lg">
+                    {filtrosAtivos.map((filtro, idx) => (
+                      <button
+                        key={idx}
+                        onClick={filtro.limpar}
+                        className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg transition-all duration-200"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#A0AEC0",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      >
+                        Remover: <strong style={{ color: "#FFFFFF" }}>{filtro.nome}</strong>
+                        <X size={12} />
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={limparFiltros}
+                    className="mt-4 px-5 py-2 rounded-lg text-[13px] font-semibold transition-all duration-200"
+                    style={{ background: "#FFB703", color: "#050015" }}
+                  >
+                    Limpar todos os filtros
+                  </button>
+                </>
+              ) : (
+                <p className="text-[#A0AEC0] text-[13px]">
+                  As vagas ainda estão sendo coletadas. Tente novamente em alguns minutos.
+                </p>
+              )}
             </div>
           )}
 
@@ -383,7 +567,6 @@ export default function VagasAdv() {
                       </span>
                     </div>
 
-                    {/* Empresa + Badge de origem (Gupy/LinkedIn) */}
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <p className="text-[14px] text-[#A0AEC0] font-medium">
                         {vaga.empresa}
@@ -447,7 +630,7 @@ export default function VagasAdv() {
 
           {/* Paginação */}
           {!carregando && totalPaginas > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-4">
+            <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
               <button
                 onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
                 disabled={paginaAtual === 1}
