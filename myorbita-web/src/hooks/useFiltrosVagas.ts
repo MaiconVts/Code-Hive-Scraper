@@ -31,6 +31,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
   const [filtroNivel, setFiltroNivel] = useState<string>("todos");
   const [filtroContrato, setFiltroContrato] = useState<string>("todos");
   const [filtroPcd, setFiltroPcd] = useState<boolean>(false);
+  const [filtroOrigem, setFiltroOrigem] = useState<string>("todas");
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const VAGAS_POR_PAGINA = 9;
@@ -55,6 +56,17 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       }
     });
     return Array.from(contratos).sort();
+  }, [vagasIniciais]);
+
+  // --- Extrair origens únicas (Gupy, LinkedIn, etc) ---
+  const origensDisponiveis = useMemo(() => {
+    const origens = new Set<string>();
+    vagasIniciais.forEach((v) => {
+      if (campoPreenchido(v.origem)) {
+        origens.add(v.origem);
+      }
+    });
+    return Array.from(origens).sort();
   }, [vagasIniciais]);
 
   // --- Pipeline de filtragem ---
@@ -115,7 +127,14 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       resultado = resultado.filter((v) => v.pcd === true);
     }
 
-    // 7. Ordenação por data de publicação
+    // 7. Filtro por origem (Gupy / LinkedIn / etc)
+    //    Comparação case-insensitive defensiva — backend padroniza, mas garante robustez
+    if (filtroOrigem !== "todas") {
+      const origemNormalizada = filtroOrigem.toLowerCase();
+      resultado = resultado.filter((v) => v.origem?.toLowerCase() === origemNormalizada);
+    }
+
+    // 8. Ordenação por data de publicação
     resultado.sort((a, b) => {
       const dA = new Date(a.data_publicacao || 0).getTime();
       const dB = new Date(b.data_publicacao || 0).getTime();
@@ -123,12 +142,12 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     });
 
     return resultado;
-  }, [vagasIniciais, busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd]);
+  }, [vagasIniciais, busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd, filtroOrigem]);
 
   // --- Reset de página ao alterar qualquer filtro (useEffect, não useMemo) ---
   useEffect(() => {
     setPaginaAtual(1);
-  }, [busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd]);
+  }, [busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd, filtroOrigem]);
 
   // --- Paginação ---
   const totalPaginas = Math.max(1, Math.ceil(vagasFiltradas.length / VAGAS_POR_PAGINA));
@@ -158,9 +177,11 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     filtroNivel, setFiltroNivel,
     filtroContrato, setFiltroContrato,
     filtroPcd, setFiltroPcd,
+    filtroOrigem, setFiltroOrigem,
     // Dados dinâmicos para popular selects
     estadosDisponiveis,
     contratosDisponiveis,
+    origensDisponiveis,
     // Paginação
     paginaAtual, setPaginaAtual,
     vagasFiltradas, vagasPagina, totalPaginas, paginasVisiveis,
