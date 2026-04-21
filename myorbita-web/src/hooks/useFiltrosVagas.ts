@@ -22,6 +22,15 @@ const campoPreenchido = (valor?: string): boolean => {
   return !!valor && valor !== "Não informado";
 };
 
+/**
+ * Descreve cada filtro ativo individualmente.
+ * Usado para chips removíveis, contador e empty state inteligente.
+ */
+export type FiltroAtivo = {
+  nome: string;
+  limpar: () => void;
+};
+
 export function useFiltrosVagas(vagasIniciais: IVaga[]) {
   // --- Estados dos filtros ---
   const [busca, setBusca] = useState("");
@@ -40,9 +49,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
   const estadosDisponiveis = useMemo(() => {
     const estados = new Set<string>();
     vagasIniciais.forEach((v) => {
-      if (campoPreenchido(v.state)) {
-        estados.add(v.state!);
-      }
+      if (campoPreenchido(v.state)) estados.add(v.state!);
     });
     return Array.from(estados).sort();
   }, [vagasIniciais]);
@@ -51,9 +58,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
   const contratosDisponiveis = useMemo(() => {
     const contratos = new Set<string>();
     vagasIniciais.forEach((v) => {
-      if (campoPreenchido(v.tipo_contrato)) {
-        contratos.add(v.tipo_contrato!);
-      }
+      if (campoPreenchido(v.tipo_contrato)) contratos.add(v.tipo_contrato!);
     });
     return Array.from(contratos).sort();
   }, [vagasIniciais]);
@@ -62,9 +67,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
   const origensDisponiveis = useMemo(() => {
     const origens = new Set<string>();
     vagasIniciais.forEach((v) => {
-      if (campoPreenchido(v.origem)) {
-        origens.add(v.origem);
-      }
+      if (campoPreenchido(v.origem)) origens.add(v.origem);
     });
     return Array.from(origens).sort();
   }, [vagasIniciais]);
@@ -74,10 +77,8 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     let resultado = [...vagasIniciais];
 
     // 1. Busca textual inteligente (multi-termo, ignora acentos e case)
-    //    Busca em: titulo, empresa, city, state, tipo_contrato
     if (busca.trim()) {
       const termosBusca = normalizarTexto(busca).split(/\s+/);
-
       resultado = resultado.filter((vaga) => {
         const textoVaga = normalizarTexto(
           `${vaga.titulo} ${vaga.empresa} ${vaga.city || ""} ${vaga.state || ""} ${vaga.tipo_contrato || ""}`
@@ -86,14 +87,14 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       });
     }
 
-    // 2. Filtro de modalidade (Remoto / Híbrido / Presencial)
+    // 2. Filtro de modalidade
     if (filtroModalidade) {
       resultado = resultado.filter((v) =>
         normalizarTexto(v.modalidade).includes(normalizarTexto(filtroModalidade))
       );
     }
 
-    // 3. Filtro de nível hierárquico (baseado no título — API não fornece campo separado)
+    // 3. Filtro de nível hierárquico
     if (filtroNivel !== "todos") {
       resultado = resultado.filter((v) => {
         const titulo = normalizarTexto(v.titulo);
@@ -112,23 +113,22 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
       });
     }
 
-    // 4. Filtro por estado (UF) — usa dados reais do backend
+    // 4. Filtro por estado (UF)
     if (filtroEstado !== "todos") {
       resultado = resultado.filter((v) => v.state === filtroEstado);
     }
 
-    // 5. Filtro por tipo de contrato (CLT / PJ / Estágio / etc)
+    // 5. Filtro por tipo de contrato
     if (filtroContrato !== "todos") {
       resultado = resultado.filter((v) => v.tipo_contrato === filtroContrato);
     }
 
-    // 6. Filtro PCD — quando ativado, mostra apenas vagas inclusivas
+    // 6. Filtro PCD
     if (filtroPcd) {
       resultado = resultado.filter((v) => v.pcd === true);
     }
 
-    // 7. Filtro por origem (Gupy / LinkedIn / etc)
-    //    Comparação case-insensitive defensiva — backend padroniza, mas garante robustez
+    // 7. Filtro por origem
     if (filtroOrigem !== "todas") {
       const origemNormalizada = filtroOrigem.toLowerCase();
       resultado = resultado.filter((v) => v.origem?.toLowerCase() === origemNormalizada);
@@ -144,7 +144,7 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     return resultado;
   }, [vagasIniciais, busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd, filtroOrigem]);
 
-  // --- Reset de página ao alterar qualquer filtro (useEffect, não useMemo) ---
+  // --- Reset de página ao alterar qualquer filtro ---
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca, filtroModalidade, ordenacao, filtroEstado, filtroNivel, filtroContrato, filtroPcd, filtroOrigem]);
@@ -158,13 +158,68 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     return vagasFiltradas.slice(inicio, fim);
   }, [vagasFiltradas, paginaAtual]);
 
-  // --- Janela de páginas visíveis na paginação ---
   const paginasVisiveis = () => {
     const pages: number[] = [];
     for (let i = Math.max(1, paginaAtual - 2); i <= Math.min(totalPaginas, paginaAtual + 2); i++) {
       pages.push(i);
     }
     return pages;
+  };
+
+  // ============================================================
+  // Metadados de filtragem — usados pela UI para:
+  //   1) Contador "X filtros aplicados"
+  //   2) Chips removíveis mostrando cada filtro ativo
+  //   3) Empty state inteligente sugerindo qual filtro soltar
+  //   4) Botão "Limpar filtros" que reseta tudo de uma vez
+  // ============================================================
+  const filtrosAtivos: FiltroAtivo[] = useMemo(() => {
+    const lista: FiltroAtivo[] = [];
+
+    if (busca.trim()) {
+      lista.push({ nome: `"${busca.trim()}"`, limpar: () => setBusca("") });
+    }
+    if (filtroModalidade) {
+      lista.push({ nome: filtroModalidade, limpar: () => setFiltroModalidade(null) });
+    }
+    if (filtroNivel !== "todos") {
+      const mapNivel: Record<string, string> = {
+        estagio: "Estágio",
+        junior: "Júnior",
+        pleno: "Pleno",
+        senior: "Sênior",
+      };
+      lista.push({ nome: mapNivel[filtroNivel] ?? filtroNivel, limpar: () => setFiltroNivel("todos") });
+    }
+    if (filtroEstado !== "todos") {
+      lista.push({ nome: filtroEstado, limpar: () => setFiltroEstado("todos") });
+    }
+    if (filtroContrato !== "todos") {
+      lista.push({ nome: filtroContrato, limpar: () => setFiltroContrato("todos") });
+    }
+    if (filtroPcd) {
+      lista.push({ nome: "PCD", limpar: () => setFiltroPcd(false) });
+    }
+    if (filtroOrigem !== "todas") {
+      lista.push({ nome: filtroOrigem, limpar: () => setFiltroOrigem("todas") });
+    }
+
+    return lista;
+  }, [busca, filtroModalidade, filtroNivel, filtroEstado, filtroContrato, filtroPcd, filtroOrigem]);
+
+  const totalFiltrosAtivos = filtrosAtivos.length;
+
+  /**
+   * Reseta todos os filtros para o estado inicial de uma vez só.
+   */
+  const limparFiltros = () => {
+    setBusca("");
+    setFiltroModalidade(null);
+    setFiltroNivel("todos");
+    setFiltroEstado("todos");
+    setFiltroContrato("todos");
+    setFiltroPcd(false);
+    setFiltroOrigem("todas");
   };
 
   return {
@@ -178,12 +233,16 @@ export function useFiltrosVagas(vagasIniciais: IVaga[]) {
     filtroContrato, setFiltroContrato,
     filtroPcd, setFiltroPcd,
     filtroOrigem, setFiltroOrigem,
-    // Dados dinâmicos para popular selects
+    // Dados dinâmicos
     estadosDisponiveis,
     contratosDisponiveis,
     origensDisponiveis,
     // Paginação
     paginaAtual, setPaginaAtual,
     vagasFiltradas, vagasPagina, totalPaginas, paginasVisiveis,
+    // Metadados de filtragem
+    filtrosAtivos,
+    totalFiltrosAtivos,
+    limparFiltros,
   };
 }
