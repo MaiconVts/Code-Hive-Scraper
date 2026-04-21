@@ -47,13 +47,17 @@ Buscar vagas em múltiplas plataformas manualmente é ineficiente. As plataforma
 ### Solução
 Sistema autônomo que coleta, padroniza e serve vagas de múltiplas fontes em interface unificada, organizada por categoria profissional.
 
-### Categorias Implementadas
+### Categorias e Fontes Implementadas
+
 | Categoria | Fonte | Rota Firebase |
 |---|---|---|
-| Tecnologia | Gupy | `/vagas-dev` |
-| Direito | Gupy | `/vagas-adv` |
+| Tecnologia | Gupy | `/vagas/dev/gupy` |
+| Tecnologia | LinkedIn | `/vagas/dev/linkedin` |
+| Direito | Gupy | `/vagas/adv/gupy` |
+| Direito | LinkedIn | `/vagas/adv/linkedin` |
 
 ### Plataformas Alvo
+
 | Plataforma | Status |
 |---|---|
 | Web (React + Vite) | 🔵 Em desenvolvimento |
@@ -65,36 +69,65 @@ Sistema autônomo que coleta, padroniza e serve vagas de múltiplas fontes em in
 
 | Camada | Tecnologia |
 |---|---|
-| Coleta de dados | Python 3.11 |
-| Banco de dados | Firebase Realtime Database |
-| Automação | GitHub Actions (diário 03:24 BRT) |
+| Coleta de dados — Gupy | Python 3.11 + `requests` |
+| Coleta de dados — LinkedIn | Python 3.11 + `curl_cffi` (TLS impersonate Chrome) + `lxml` |
+| Banco de dados | Firebase Realtime Database (`my-orbit-prod`) |
+| Analytics | Google Analytics 4 (via Firebase) |
+| Automação | GitHub Actions (Gupy 03:42 BRT, LinkedIn 04:45 BRT) |
 | Web | React + Vite + TypeScript |
 | Mobile | React Native + Expo (planejado) |
-| Deploy Web | Vercel / Firebase Hosting |
+| Deploy Web | Vercel ou Firebase Hosting |
 
 ---
 
 ## ARQUITETURA
 
 ```
-GitHub Actions (03:24 diário)
-        ↓
-    main.py
-        ↓
-  Scrapers (Gupy, ...)
-        ↓
-Firebase Realtime DB
-    ↙        ↘
-Web App    Mobile App
+GitHub Actions (workflows independentes)
+        │
+        ├──► gupy.yml (03:42 BRT)        ──► main_gupy.py     ──► GupyScraper
+        │                                                          │
+        └──► linkedin.yml (04:45 BRT)    ──► main_linkedin.py ──► LinkedinScraper
+                                                                   │
+                                          scraper_runner.py ◄──────┤
+                                          (orquestração compartilhada)
+                                                   │
+                                                   ▼
+                                          Firebase Realtime DB
+                                          /vagas/dev/{gupy,linkedin}
+                                          /vagas/adv/{gupy,linkedin}
+                                                   │
+                                                   ▼
+                                              Web App (React)
+                                              Mobile App (planejado)
 ```
 
 ### Padrões de Projeto Implementados
-- **Template Method** — `BaseScraper` define contrato abstrato obrigatório para todos os scrapers
-- **Strategy Pattern** — `SCRAPERS_DISPONIVEIS` roteia plataformas dinamicamente (OCP)
-- **Strategy Pattern** — `CATEGORIAS` roteia categorias dinamicamente (OCP)
-- **Atomic Write** — escrita em arquivo temporário + `os.replace` para evitar corrupção
-- **Exponential Backoff + Jitter** — resiliência contra rate limiting (HTTP 429)
+- **Template Method** — `BaseScraper` define contrato abstrato obrigatório (`buscar_vagas`, `padronizar_vaga`, `gerar_id_deterministico`)
+- **Strategy Pattern** — Cada `main_*.py` instancia seu scraper específico, permitindo workflows isolados
+- **DRY via Composition** — `scraper_runner.py` concentra lógica de orquestração compartilhada (logging, Firebase, dedup, métricas)
+- **Atomic Write** — Substituído por escrita direta no Firebase via `ref.set()` (Firebase é fonte única de verdade)
+- **Exponential Backoff + Jitter** — Resiliência contra rate limiting (HTTP 429)
 - **Hashing Determinístico** — `hashlib.md5(url)` gera IDs idempotentes por vaga
+
+### Anti-Detecção LinkedIn (11 camadas)
+1. **TLS Fingerprint** — `curl_cffi` com `impersonate="chrome"` replica handshake JA3/HTTP2 de Chrome real
+2. **Session Persistente** — mantém cookies entre requests
+3. **Warm-up 3 etapas** — Google → Homepage → /jobs/ antes de buscar
+4. **Headers Sec-Fetch-*** — que navegadores modernos enviam e bots não
+5. **Rotação User-Agent** — 5 variações de Chrome/Firefox/Safari
+6. **Delays Gaussianos** — `random.gauss()` com jitter ±25% (humanos têm bell curve, não flat)
+7. **Cooldown Keywords** — pausa entre palavras-chave diferentes
+8. **Detecção Tríplice** — authwall + captcha + response size anomaly
+9. **Circuit Breaker** — 5 erros consecutivos → abort automático
+10. **Teto Global** — 200 requests máximos por execução
+11. **Referer Chain** — cada request tem referer da página anterior
+
+### Filtros LinkedIn Validados
+- `geoId=106057199` — força vagas brasileiras apenas
+- `f_WT=1` — Presencial (validado: conjunto disjunto)
+- `f_WT=2` — Remoto (validado: conjunto disjunto)
+- `f_WT=3` — Híbrido (validado: conjunto disjunto)
 
 ---
 
@@ -103,25 +136,31 @@ Web App    Mobile App
 ```
 MyOrbita-Scraper/
 ├── .claude/
-│   └── CLAUDE.md                   # Este arquivo
+│   └── CLAUDE.md                       # Este arquivo
 ├── .github/
 │   └── workflows/
-│       └── scraper.yml             # GitHub Actions — execução diária
-├── myorbita-web/                  # Aplicação web React + Vite (Sprint 2)
-├── myorbita-mobile/               # React Native + Expo (Sprint 8 — bloqueado)
+│       ├── gupy.yml                    # Scraper Gupy — 03:42 BRT
+│       └── linkedin.yml                # Scraper LinkedIn — 04:45 BRT
+├── myorbita-web/                       # Aplicação web React + Vite
+│   └── .env                            # Vars Firebase Web (não versionado)
+├── myorbita-app/                       # React Native + Expo (Sprint 8 — bloqueado)
+├── queries/
+│   ├── tecnologia_gupy.json            # Keywords tecnologia → Gupy
+│   ├── tecnologia_linkedin.json        # Keywords tecnologia → LinkedIn
+│   ├── advogados_gupy.json             # Keywords direito → Gupy
+│   └── advogados_linkedin.json         # Keywords direito → LinkedIn
 ├── scrapers/
 │   ├── __init__.py
-│   ├── base_scraper.py             # Contrato abstrato (Template Method)
-│   └── gupy_scraper.py             # Implementação Gupy
+│   ├── base_scraper.py                 # Contrato abstrato (Template Method)
+│   ├── gupy_scraper.py                 # Scraper Gupy (API)
+│   └── linkedin_scraper.py             # Scraper LinkedIn (HTML + curl_cffi)
 ├── secrets/
-│   └── *.json                      # Chave Firebase (nunca versionada)
-├── .env                            # Variáveis de ambiente (nunca versionado)
+│   └── firebase_key.json               # Service Account (não versionado)
+├── .env                                # Vars backend (não versionado)
 ├── .gitignore
-├── db_dev.json                     # Backup local — vagas de tecnologia
-├── db_adv.json                     # Backup local — vagas de direito
-├── main.py                         # Orquestrador principal
-├── queries_tecnologia.json         # Palavras-chave — tecnologia
-├── queries_advogados.json          # Palavras-chave — direito
+├── main_gupy.py                        # Entry point Gupy
+├── main_linkedin.py                    # Entry point LinkedIn
+├── scraper_runner.py                   # Orquestração compartilhada (DRY)
 └── README.md
 ```
 
@@ -131,7 +170,7 @@ MyOrbita-Scraper/
 
 ### Python (Scraper)
 - Snake_case para funções e variáveis: `carregar_configuracoes()`
-- UPPER_CASE para constantes: `ARQUIVO_DB_TEMP`, `CATEGORIAS`
+- UPPER_CASE para constantes: `F_WT_MAP`, `MODALIDADE_MAP`
 - Prefixo `_` para métodos privados: `_mapear_modalidade()`
 - Docstrings obrigatórias em todas as funções
 - Type hints obrigatórios em parâmetros e retornos
@@ -156,14 +195,33 @@ MyOrbita-Scraper/
 
 ## VARIÁVEIS DE AMBIENTE
 
+### Backend (`.env` na raiz)
 ```env
-FIREBASE_KEY_PATH=secrets/sua-chave-firebase.json
+FIREBASE_KEY_PATH=secrets/firebase_key.json
 FIREBASE_DB_URL=https://my-orbit-prod-default-rtdb.firebaseio.com
 ```
+
+### Frontend (`myorbita-web/.env`)
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=my-orbit-prod.firebaseapp.com
+VITE_FIREBASE_DATABASE_URL=https://my-orbit-prod-default-rtdb.firebaseio.com
+VITE_FIREBASE_PROJECT_ID=my-orbit-prod
+VITE_FIREBASE_STORAGE_BUCKET=my-orbit-prod.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=...
+```
+
+### GitHub Secrets
+- `FIREBASE_CREDENTIALS` — JSON completo da Service Account
+- `FIREBASE_DB_URL` — URL do Realtime Database
 
 ---
 
 ## ESTADO ATUAL E TASKS
+
+> ⚠️ **Numeração das Fases preservada** para alinhamento com o Kanban público.
 
 ### ✅ Concluído — Sprint 0 (Fundação)
 - Definição de escopo e requisitos do produto
@@ -171,64 +229,67 @@ FIREBASE_DB_URL=https://my-orbit-prod-default-rtdb.firebaseio.com
 - Estrutura do monorepo definida
 
 ### ✅ Concluído — Sprint 1 (Infraestrutura)
-- Scrapers implementados com Template Method + Strategy
-- Firebase Realtime Database configurado
-- Sistema de categorias (CATEGORIAS dict)
-- Escrita atômica + deduplicação O(1)
-- GitHub Actions rodando diariamente às 03:24 BRT
-- Credenciais protegidas via GitHub Secrets + .gitignore
+- [x] FASE 1.1 — Escolha e configuração do banco de dados
+- [x] FASE 1.2 — Adaptar `main.py` para upload Firebase
+- [x] FASE 1.3 — Automação com GitHub Actions
+- [x] FASE 1.4 — Segurança e credenciais
 
-### 🔵 Em andamento — Sprint 2 (Web)
-- [x] Criar projeto React + Vite em `myorbita-web/`
-- [x] Configurar Firebase SDK no frontend
-- [x] Validar consumo de dados reais do Firebase
+### ✅ Concluído — Sprint 2 (Web)
+- [x] FASE 2.1 — Criar projeto React Web
+- [x] FASE 2.2 — Configurar Firebase no projeto web
+- [x] FASE 2.3 — Validar consumo de dados
 
-### 📋 A fazer — Sprint 3 (Design System)
-- [x] Definir paleta completa de cores
-- [x] Definir tipografia (família, tamanhos, pesos)
-- [x] Definir estados visuais (erro, sucesso, alerta, vazio, loading)
-- [x] Importar logos e animação de transição
-- [x] Documentar em `constants/colors.ts` e `constants/typography.ts`
+### ✅ Concluído — Sprint 3 (Design System)
+- [x] FASE 3.1 — Definir design system completo (cores, tipografia, estados)
+- [x] FASE 3.2 — Documentar design system no código (`constants/colors.ts`, `constants/typography.ts`)
 
-### 📋 A fazer — Sprint 4 (Prototipação)
-- [x] Prototipar telas no Figma/V0/Galileo
-- [x] Validar fluxo de navegação antes de codar
+### ✅ Concluído — Sprint 4 (Prototipação)
+- [x] FASE 4.1 — Prototipar telas
+- [x] FASE 4.2 — Validar fluxo de navegação
 
-### 📋 A fazer — Sprint 5 (Telas Web)
-- [x] Página de vagas Dev com FlatList + VagaCard
-- [x] Página de vagas Jurídico
-- [x] Navegação com React Router
-- [x] Página de detalhe da vaga
-- [x] Filtros por modalidade e data (useMemo)
-- [] Cache local
+### 🔵 Em andamento — Sprint 5 (Telas Web)
+- [x] FASE 5.1 — Conectar Firebase ao projeto web
+- [x] FASE 5.2 — Página de vagas Dev
+- [x] FASE 5.3 — Página de vagas Jurídico
+- [x] FASE 5.4 — Navegação React Router + página de detalhe
+- [x] FASE 5.5 — Filtros (modalidade, data, estado, contrato, PCD, busca textual)
+- [ ] FASE 5.6 — Refatorar `services/api.ts` para buscar das 4 rotas novas (Gupy + LinkedIn) e mergear
+- [ ] FASE 5.7 — Atualizar `constants/routes.ts` com as 4 rotas
+- [ ] FASE 5.8 — Badge de origem nos cards (Gupy azul claro / LinkedIn azul escuro)
+- [ ] FASE 5.9 — Filtro por origem (toggle Todas / Gupy / LinkedIn)
 
 ### 📋 A fazer — Sprint 6 (Qualidade)
-- [x] Aplicar design system completo
-- [ ] Testar em múltiplos navegadores
-- [x] Validar responsividade
-- [ ] Implementar cache local no frontend (AsyncStorage/localStorage, TTL 1h) para reduzir reads no Firebase
-- [ ] Pull-to-refresh para invalidar cache manualmente
+- [x] FASE 6.1 — Aplicar design system completo
+- [x] FASE 6.2 — Validar responsividade
+- [ ] FASE 6.3 — Cache local no frontend (AsyncStorage/localStorage, TTL 1h) para reduzir reads no Firebase
+- [ ] FASE 6.4 — Pull-to-refresh para invalidar cache manualmente
+- [ ] FASE 6.5 — Testar em múltiplos navegadores (cross-browser)
 
 ### 📋 A fazer — Sprint 7 (Deploy)
-- [ ] Deploy via Vercel ou Firebase Hosting
-- [ ] URL pública funcional
-- [ ] Monitoramento de cota do Firebase (alertas quando próximo do limite)
+- [ ] FASE 7.1 — Termos de Uso (página dedicada + link no footer — LGPD/Play Store)
+- [ ] FASE 7.2 — Política de Privacidade (página dedicada + link no footer — LGPD/Play Store)
+- [ ] FASE 7.3 — Página Sobre (créditos e contexto)
+- [ ] FASE 7.4 — "Como usar" e "Como funciona" (hover dropdown no header web / modal mobile)
+- [ ] FASE 7.5 — Deploy via Vercel ou Firebase Hosting
+- [ ] FASE 7.6 — URL pública funcional + domínio (se aplicável)
+- [ ] FASE 7.7 — Monitoramento de cota do Firebase (alertas quando próximo do limite)
 
 ### 🚫 Bloqueado — Sprint 8 (Mobile)
-- [ ] Configurar AVD + Expo Orbit
-- [ ] Adaptar web para React Native
-- [ ] Gerar APK
+- [ ] FASE 8.1 — Ambiente Mobile (Configurar AVD + Expo Orbit)
+- [ ] FASE 8.2 — Versão Mobile React Native (adaptar web)
+- [ ] FASE 8.3 — Gerar APK e validar instalação
 
 ### 🚫 Bloqueado — Sprint 9 (Repositório Final)
-- [ ] Licença All Rights Reserved
-- [ ] README final completo
-- [ ] Badges de status
+- [ ] FASE 9.1 — Licença e proteção do repositório
+- [ ] FASE 9.2 — README e badges finais
 
 ### 🔮 Futuro — Sprint 10 (Escalabilidade)
-- [ ] Cache backend (Firebase Functions ou Cloudflare Workers) — só se cota do Firebase começar a ficar apertada
-- [ ] Endpoint intermediário servindo dataset cacheado (~1 read/hora no Firebase independente do nº de usuários)
-- [ ] Métricas de uso: reads/dia, usuários ativos, tempo médio de resposta
-- [ ] Considerar migração para Firestore se Realtime DB limitar
+- [ ] FASE 10.1 — Cache backend (Firebase Functions ou Cloudflare Workers) — só se cota do Firebase começar a ficar apertada
+- [ ] FASE 10.2 — Endpoint intermediário servindo dataset cacheado (~1 read/hora no Firebase independente do nº de usuários)
+- [ ] FASE 10.3 — Análise de métricas via Google Analytics: reads/dia, usuários ativos, tempo médio de resposta, vagas mais clicadas
+- [ ] FASE 10.4 — Considerar migração para Firestore se Realtime DB limitar
+
+---
 
 ## REGRAS DO PROJETO
 
@@ -237,32 +298,25 @@ FIREBASE_DB_URL=https://my-orbit-prod-default-rtdb.firebaseio.com
 3. **Branching:** `main` → `developer` → `feature/nome-da-feature`
 4. **Firebase:** estrutura de dados usa ID determinístico MD5 como chave
 5. **Licença:** All Rights Reserved — uso comercial proibido sem autorização do autor
-6. **Repositório público** — portfólio técnico de Maicon Vitor
+6. **Repositório público** — portfólio técnico de Maicon Vitor (`MaiconVts/MyOrbita`)
+7. **Workflows isolados** — Gupy e LinkedIn rodam em workflows separados; falha em um não afeta o outro
 
+---
 
+## NOTAS DE DESIGN — UI/UX (Reference)
 
-idéias  só para não perder por agora.
+### Termos / Privacidade / Como Usar — Padrão de Localização
 
+| Item | Onde | Por quê |
+|---|---|---|
+| Como funciona | Hover + dropdown no header (web), modal (mobile), ou onboarding | Informacional, não jurídico |
+| Como usar | Hover + dropdown ou FAQ dedicada | Informacional, não jurídico |
+| Termos de Uso | Footer fixo + página dedicada (URL pública) | Exigido por LGPD + Play/App Store |
+| Política de Privacidade | Footer fixo + página dedicada (URL pública) | Exigido por LGPD + Play/App Store |
+| Sobre / Créditos | Footer ou hover, indiferente | Informacional |
 
+**Atenção mobile:** hover não existe em React Native nem em mobile web — vira tap/touch. Implementar como click-to-open modal pra ter UX consistente entre web e mobile.
 
-Sobre o padrão hover + dropdown pra Termos/Como usar/Como funciona:
-Funciona muito bem na home, mas tem algumas considerações:
-
-No mobile não tem hover — em React Native e mobile web, hover não existe. Vira tap/touch. Então planeja desde já que no mobile isso vira um click que abre um modal ou navega pra uma tela dedicada. Se você quer "uma única implementação" pra web + mobile, melhor ir de click-to-open direto (vira consistent entre plataformas).
-Para Termos de Uso e Política de Privacidade especificamente — esses não devem ficar só num dropdown de hover. Razões:
-
-LGPD exige que o usuário consiga acessar a qualquer momento, de forma clara
-Play Store / App Store exigem URL pública (tipo myorbita.com.br/privacidade) pra aprovar o app
-Se mudar algo crítico, você precisa notificar usuários — hover dropdown não serve pra isso
-O padrão universal é link fixo no footer ("Termos" | "Privacidade" | "Sobre") — usuários esperam isso
-
-Pode ter no header via hover + dropdown também, mas tenha no footer obrigatoriamente.
-"Como usar" e "Como funciona" — esses sim cabem perfeitamente no dropdown de hover. São informacionais, não-jurídicos, e não precisam de URL pública dedicada. Alternativa ainda melhor: página de onboarding na primeira abertura + tooltip sutil no header depois.
-
-
-Resumo prático:
-ItemOndeComo funcionaHover + dropdown ✅ (ou onboarding)Como usarHover + dropdown ✅ (ou FAQ)Termos de usoFooter fixo + página dedicada ⚠️Política de privacidadeFooter fixo + página dedicada ⚠️Sobre / créditosFooter fixo ou hover, tanto faz
-
-Anota isso pra quando for implementar a home. Agora, bora voltar — já terminou a criação do projeto Firebase?
-
-
+### Cores de Badge por Origem
+- Gupy: `#4FC3F7` (azul claro)
+- LinkedIn: `#0077B5` (azul escuro oficial LinkedIn)
