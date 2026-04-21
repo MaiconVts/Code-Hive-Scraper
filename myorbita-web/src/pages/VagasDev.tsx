@@ -32,6 +32,14 @@ const contratoCor: Record<string, string> = {
   "Banco de Talentos": "#94A3B8",
 };
 
+// Mapa de cores por plataforma de origem.
+// Cada plataforma tem cor única para identificação visual rápida.
+// Fallback cinza (#94A3B8) para origens não mapeadas (defensive coding).
+const origemCor: Record<string, string> = {
+  Gupy: "#4FC3F7",     // Azul claro — combina com tema Dev
+  LinkedIn: "#0077B5", // Azul oficial LinkedIn
+};
+
 function formatarData(iso: string): string {
   if (!iso) return "—";
   try {
@@ -80,8 +88,11 @@ export default function VagasDev() {
     setFiltroContrato,
     filtroPcd,
     setFiltroPcd,
+    filtroOrigem,
+    setFiltroOrigem,
     estadosDisponiveis,
     contratosDisponiveis,
+    origensDisponiveis,
     paginaAtual,
     setPaginaAtual,
     vagasFiltradas,
@@ -93,7 +104,10 @@ export default function VagasDev() {
   useEffect(() => {
     (async () => {
       setCarregando(true);
-      const data = await getVagas(ROUTES.VAGAS_DEV);
+      const data = await getVagas([
+        ROUTES.FIREBASE_VAGAS_DEV_GUPY,
+        ROUTES.FIREBASE_VAGAS_DEV_LINKEDIN,
+      ]);
       setVagasRaw(data);
       setCarregando(false);
     })();
@@ -348,6 +362,50 @@ export default function VagasDev() {
                 PCD
               </button>
             </div>
+
+            {/* Linha 3: Toggle de origem (Gupy / LinkedIn) — só aparece se há mais de uma fonte */}
+            {origensDisponiveis.length > 1 && (
+              <div
+                className="flex items-center gap-1 p-1.5 rounded-[12px] self-start"
+                style={{
+                  background: "rgba(0,0,0,0.2)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                }}
+              >
+                {/* Botão "Todas" — sempre primeiro */}
+                <button
+                  onClick={() => setFiltroOrigem("todas")}
+                  className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
+                  style={{
+                    background: filtroOrigem === "todas" ? "#FFB703" : "transparent",
+                    color: filtroOrigem === "todas" ? "#050015" : "#A0AEC0",
+                    fontWeight: filtroOrigem === "todas" ? 600 : 500,
+                  }}
+                >
+                  Todas
+                </button>
+
+                {/* Um botão por origem disponível */}
+                {origensDisponiveis.map((origem) => {
+                  const isActive = filtroOrigem === origem;
+                  const cor = origemCor[origem] ?? "#94A3B8";
+                  return (
+                    <button
+                      key={origem}
+                      onClick={() => setFiltroOrigem(origem)}
+                      className="px-4 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
+                      style={{
+                        background: isActive ? cor : "transparent",
+                        color: isActive ? "#050015" : "#A0AEC0",
+                        fontWeight: isActive ? 600 : 500,
+                      }}
+                    >
+                      {origem}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Loading */}
@@ -376,6 +434,7 @@ export default function VagasDev() {
                 const corMod = modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
                 const corCont =
                   contratoCor[vaga.tipo_contrato || ""] ?? "#94A3B8";
+                const corOri = origemCor[vaga.origem] ?? "#94A3B8";
                 const temLocal = vaga.city && vaga.city !== "Não informado";
                 const prazo =
                   vaga.prazo_inscricao &&
@@ -430,13 +489,24 @@ export default function VagasDev() {
                       </span>
                     </div>
 
-                    <p className="text-[14px] text-[#A0AEC0] mb-2 font-medium">
-                      {vaga.empresa}
-                      <span className="text-[#4a4a6a] mx-2">·</span>
-                      <span className="text-[#4a4a6a] text-[12px]">
-                        {vaga.origem}
-                      </span>
-                    </p>
+                    {/* Empresa + Badge de origem (Gupy/LinkedIn) */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <p className="text-[14px] text-[#A0AEC0] font-medium">
+                        {vaga.empresa}
+                      </p>
+                      {vaga.origem && (
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{
+                            background: `${corOri}15`,
+                            color: corOri,
+                            border: `1px solid ${corOri}30`,
+                          }}
+                        >
+                          {vaga.origem}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2 mb-4">
                       {temLocal && (
@@ -554,7 +624,9 @@ export default function VagasDev() {
           {/* Rodapé */}
           {!carregando && (
             <div className="w-full mt-auto pt-8 flex flex-col sm:flex-row items-center justify-between border-t border-[rgba(255,255,255,0.05)] gap-4 text-center sm:text-left">
-              <p className="text-[13px] text-[#A0AEC0]">Atualizado via Gupy</p>
+              <p className="text-[13px] text-[#A0AEC0]">
+                Atualizado via Gupy + LinkedIn
+              </p>
               <div
                 className="px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-2"
                 style={{
