@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getVagas } from "../services/api";
 import type { IVaga } from "../types/IVaga";
 
@@ -100,6 +100,8 @@ type UseCacheVagasReturn = {
   recarregar: () => Promise<void>;
   /** True enquanto um refetch manual está acontecendo (distinto de carregando). */
   atualizando: boolean;
+  /** Mensagem de erro da última tentativa de fetch (null se bem-sucedida). */
+  erro: string | null;
 };
 
 /**
@@ -113,22 +115,38 @@ export function useCacheVagas(rotas: string[]): UseCacheVagasReturn {
   const [carregando, setCarregando] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  // Estabiliza a referência de `rotas` pelo conteúdo, não pela identidade do array.
+  // Evita que o consumidor passando `[ROUTE_A, ROUTE_B]` inline a cada render
+  // invalide useCallback/useEffect desnecessariamente.
+  const rotasRef = useRef<string[]>(rotas);
+  const rotasAssinatura = rotas.join("|");
+  if (rotasRef.current.join("|") !== rotasAssinatura) {
+    rotasRef.current = rotas;
+  }
 
   /**
    * Busca as vagas de cada rota, priorizando cache local.
    * Só rotas expiradas/sem cache geram fetch real ao Firebase.
    *
+   * Cada rota é fetchada individualmente (Promise.all) para garantir isolamento:
+   * os dados de /vagas/dev/gupy jamais contaminam /vagas/adv/gupy no cache,
+   * mesmo que ambas tenham o mesmo campo 'origem'.
+   *
    * @param forcar Se true, ignora cache e sempre fetcha do Firebase
    */
   const buscarTodas = useCallback(
     async (forcar: boolean = false) => {
-      // Se nenhum cache hit acontecer, timestamps valem Date.now() ao final
-      let timestampMaisAntigo = Date.now();
+      const rotasAtuais = rotasRef.current;
+
+      // null = nenhum cache hit ainda; vamos preencher conforme lemos cache.
+      let timestampMaisAntigo: number | null = null;
       const rotasParaFetchar: string[] = [];
       const vagasDoCache: IVaga[] = [];
 
       // 1. Passo: verifica cache de cada rota
-      for (const rota of rotas) {
+      for (const rota of rotasAtuais) {
         if (forcar) {
           invalidarCacheRota(rota);
           rotasParaFetchar.push(rota);
@@ -139,7 +157,7 @@ export function useCacheVagas(rotas: string[]): UseCacheVagasReturn {
         if (entry) {
           vagasDoCache.push(...entry.vagas);
           // Pra o "atualizado há X" usamos o timestamp mais antigo entre as rotas cacheadas
-          if (entry.timestamp < timestampMaisAntigo) {
+          if (timestampMaisAntigo === null || entry.timestamp < timestampMaisAntigo) {
             timestampMaisAntigo = entry.timestamp;
           }
         } else {
@@ -147,40 +165,67 @@ export function useCacheVagas(rotas: string[]): UseCacheVagasReturn {
         }
       }
 
-      // 2. Passo: se precisa fetchar algo, chama getVagas (que já tem Promise.allSettled)
+      // 2. Passo: se precisa fetchar algo, busca cada rota individualmente em paralelo.
+      // Buscar rota por rota é essencial: getVagas retorna vagas mescladas sem metadado
+      // de origem-rota, e tentar reagrupar por campo 'origem' contamina o cache entre
+      // categorias (dev/adv compartilham origem Gupy/LinkedIn).
       if (rotasParaFetchar.length > 0) {
-        const vagasFetchadas = await getVagas(rotasParaFetchar);
+        const fetchesParalelos = await Promise.all(
+          rotasParaFetchar.map(async (rota) => {
+            const vagasRota = await getVagas([rota]);
+            salvarCacheRota(rota, vagasRota);
+            return vagasRota;
+          })
+        );
+        const vagasFetchadas = fetchesParalelos.flat();
 
-        // Reagrupa por rota pra salvar cache individual (vagas vieram mescladas)
-        for (const rota of rotasParaFetchar) {
-          const vagasDessaRota = vagasFetchadas.filter(
-            (v) => v.origem && rotaPertenceAOrigem(rota, v.origem)
-          );
-          salvarCacheRota(rota, vagasDessaRota);
-        }
-
-        // Junta tudo: cache + fetch novo
         const todasMescladas = [...vagasDoCache, ...vagasFetchadas];
         setVagas(todasMescladas);
-        setAtualizadoEm(Date.now());
+
+        // Se TODAS as rotas foram fetchadas agora, atualizadoEm = agora.
+        // Se foi um hit parcial (parte cache, parte fetch), o valor mais antigo
+        // reflete a realidade melhor do que mentir "atualizado agora".
+        if (rotasParaFetchar.length === rotasAtuais.length) {
+          setAtualizadoEm(Date.now());
+        } else {
+          setAtualizadoEm(timestampMaisAntigo ?? Date.now());
+        }
       } else {
         // Tudo veio do cache — usa o timestamp mais antigo
         setVagas(vagasDoCache);
-        setAtualizadoEm(timestampMaisAntigo);
+        setAtualizadoEm(timestampMaisAntigo ?? Date.now());
       }
     },
-    [rotas]
+    // rotasAssinatura muda quando o CONTEÚDO do array muda.
+    // Não depende da identidade do array passado pelo consumidor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rotasAssinatura]
   );
 
-  // Carga inicial: roda uma vez no mount
+  // Carga inicial: roda uma vez no mount (e quando o conteúdo das rotas muda)
   useEffect(() => {
+    let cancelado = false;
+
     (async () => {
       setCarregando(true);
-      await buscarTodas(false);
-      setCarregando(false);
+      setErro(null);
+      try {
+        await buscarTodas(false);
+      } catch (e) {
+        if (!cancelado) {
+          const msg = e instanceof Error ? e.message : "Erro desconhecido ao buscar vagas";
+          console.error("[useCacheVagas] Falha ao carregar:", e);
+          setErro(msg);
+        }
+      } finally {
+        if (!cancelado) setCarregando(false);
+      }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    return () => {
+      cancelado = true;
+    };
+  }, [buscarTodas]);
 
   /**
    * Força refetch completo, ignorando cache.
@@ -188,20 +233,17 @@ export function useCacheVagas(rotas: string[]): UseCacheVagasReturn {
    */
   const recarregar = useCallback(async () => {
     setAtualizando(true);
-    await buscarTodas(true);
-    setAtualizando(false);
+    setErro(null);
+    try {
+      await buscarTodas(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido ao recarregar vagas";
+      console.error("[useCacheVagas] Falha ao recarregar:", e);
+      setErro(msg);
+    } finally {
+      setAtualizando(false);
+    }
   }, [buscarTodas]);
 
-  return { vagas, carregando, atualizando, atualizadoEm, recarregar };
-}
-
-/**
- * Helper: verifica se uma rota Firebase corresponde a uma origem.
- * Ex: '/vagas/dev/gupy' → vagas com origem='Gupy'
- *     '/vagas/dev/linkedin' → vagas com origem='LinkedIn'
- *
- * Comparação case-insensitive porque o backend padroniza, mas defensivo.
- */
-function rotaPertenceAOrigem(rota: string, origem: string): boolean {
-  return rota.toLowerCase().endsWith(`/${origem.toLowerCase()}`);
+  return { vagas, carregando, atualizando, atualizadoEm, recarregar, erro };
 }
