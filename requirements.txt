@@ -1,0 +1,5 @@
+firebase-admin
+python-dotenv
+requests
+curl_cffi
+lxml
