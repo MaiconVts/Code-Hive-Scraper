@@ -56,6 +56,20 @@ export default function TermosDeUso({ onClose }: IProps) {
         {/* Conteúdo scrollável */}
         <div style={{ padding: '28px 32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
+          {/* Aviso de consentimento */}
+          <div style={{
+            padding: '14px 18px',
+            background: 'rgba(79,195,247,0.07)',
+            border: '1px solid rgba(79,195,247,0.2)',
+            borderRadius: '12px',
+          }}>
+            <p style={{ fontSize: '13px', color: '#A0AEC0', lineHeight: 1.7, margin: 0 }}>
+              <strong style={{ color: '#4FC3F7' }}>Ao utilizar o MyOrbita</strong>, você declara
+              que leu, compreendeu e concorda integralmente com estes Termos de Uso.
+              Caso não concorde, interrompa o uso da plataforma.
+            </p>
+          </div>
+
           <Secao titulo="1. Sobre o MyOrbita">
             O MyOrbita é uma plataforma de uso pessoal e portfólio técnico que agrega vagas de
             emprego publicamente disponíveis nas plataformas Gupy e LinkedIn, exibindo-as de forma

@@ -67,7 +67,7 @@ export default function Sobre({ onClose }: IProps) {
           <Secao titulo="Autor">
             <strong style={{ color: '#FFFFFF' }}>Maicon Vitor Theodoro da Silva</strong>
             <br />
-            Advogado e Desenvolvedor — Vespasiano, MG
+            Desenvolvedor FullStack — Vespasiano, MG
             <br />
             <a
               href="https://github.com/MaiconVts/MyOrbita"
@@ -84,7 +84,7 @@ export default function Sobre({ onClose }: IProps) {
             <LinhaStack label="Banco de Dados" value="Firebase Realtime Database" />
             <LinhaStack label="Automação" value="GitHub Actions — execução diária" />
             <LinhaStack label="Frontend" value="React 19 + Vite + TypeScript + Tailwind CSS" />
-            <LinhaStack label="Animações" value="Framer Motion + Rive" />
+            <LinhaStack label="Animações" value="Framer Motion" />
           </Secao>
 
           <Secao titulo="Fontes de Dados">

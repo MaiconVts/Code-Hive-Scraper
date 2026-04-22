@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx tsc *)",
+      "Bash(python -m py_compile scrapers/linkedin_scraper.py)",
+      "Bash(git commit *)",
+      "Bash(python -m py_compile scrapers/base_scraper.py)"
+    ]
+  }
+}
