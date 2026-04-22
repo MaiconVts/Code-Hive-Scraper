@@ -265,18 +265,26 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [x] FASE 6.4 — Pull-to-refresh via `recarregar()` que invalida cache e re-fetcha do Firebase
 - [ ] FASE 6.5 — Testar em múltiplos navegadores (cross-browser) (Deixar para fase de testes automatizados)
 
+### ✅ Concluído — Sprint 7 (Informativo)
+- Seção de links no footer da Home (abaixo dos cards) — cada item abre modal próprio
+- [x] FASE 7.1 — Modal Termos de Uso (`TermosDeUso.tsx`) — LGPD, Google Analytics, isenção
+- [x] FASE 7.2 — Modal Política de Privacidade (`PoliticaPrivacidade.tsx`) — LGPD, GA4, DPO
+- [x] FASE 7.3 — Modal Sobre (`Sobre.tsx`) — autor, stack, fontes de dados
+- [x] FASE 7.4 — Modal Como Usar (`ComoUsar.tsx`) + Modal Como Funciona (`ComoFunciona.tsx`)
+
 ### 📋 A fazer — Sprint 7 (Deploy)
-- Criar uma seção no footer da pagina principal com quaisquer dessas telas mais "estaticas, informativas e explicativas aqui"
-  - cada uma terá sua próprio modal, acredito ficar mais condinzente e dinâmico com o projeto atual.
-- [ ] FASE 7.1 — Termos de Uso (LGPD/Play Store) Google Analytics e etc.
-- [ ] FASE 7.2 — Política de Privacidade (página dedicada + link no footer — LGPD/Play Store)
-- [ ] FASE 7.3 — Página Sobre (créditos e contexto)
-- [ ] FASE 7.4 — "Como usar" e "Como funciona" (hover dropdown no header web / modal mobile)
-
-
 - [ ] FASE 7.5 — Deploy via Vercel ou Firebase Hosting
 - [ ] FASE 7.6 — URL pública funcional + domínio (se aplicável)
 - [ ] FASE 7.7 — Monitoramento de cota do Firebase (alertas quando próximo do limite)
+
+### 📋 A fazer — Sprint 7.5 (Testes Automatizados)
+> Plano completo documentado em `PLANO_TESTES.md` na raiz do projeto.
+- [ ] FASE T1 — Testes unitários backend (pytest): normalização, mapeamentos, dedup, ID, contrato
+- [ ] FASE T2 — Testes de integração backend: API Gupy real, Firebase (env de teste)
+- [ ] FASE T3 — Testes de resiliência backend: retry/backoff, JSON malformado, timeout
+- [ ] FASE T4 — Testes unitários frontend (vitest): `useFiltrosVagas`, utilitários (formatarData, corPrazo, campoValido)
+- [ ] FASE T5 — Testes E2E (Playwright): responsividade, segurança, usabilidade, acessibilidade, performance, regressão visual, cross-browser
+- [ ] FASE T6 — Integrar testes ao GitHub Actions (CI)
 
 ### 🚫 Bloqueado — Sprint 8 (Mobile)
 - [ ] FASE 8.1 — Ambiente Mobile (Configurar AVD + Expo Orbit)

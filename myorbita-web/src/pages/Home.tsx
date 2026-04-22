@@ -1,8 +1,26 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Scale, Code2 } from "lucide-react";
 import PageTransition from "../components/PageTransition";
+import TermosDeUso from "../components/modals/TermosDeUso";
+import PoliticaPrivacidade from "../components/modals/PoliticaPrivacidade";
+import Sobre from "../components/modals/Sobre";
+import ComoUsar from "../components/modals/ComoUsar";
+import ComoFunciona from "../components/modals/ComoFunciona";
+
+type ModalAberto = 'termos' | 'privacidade' | 'sobre' | 'como-usar' | 'como-funciona' | null;
+
+const linksFooter: { label: string; id: ModalAberto }[] = [
+  { label: 'Termos de Uso', id: 'termos' },
+  { label: 'Privacidade', id: 'privacidade' },
+  { label: 'Sobre', id: 'sobre' },
+  { label: 'Como Usar', id: 'como-usar' },
+  { label: 'Como Funciona', id: 'como-funciona' },
+];
 
 export default function Home() {
+  const [modalAberto, setModalAberto] = useState<ModalAberto>(null);
+
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col items-center justify-center px-12 pt-20 pb-12"
@@ -103,12 +121,52 @@ export default function Home() {
 
         </div>
 
-        {/* Rodapé */}
-        <p className="text-[11px] text-[#2e2e4a] tracking-[0.2em] uppercase mt-16">
-          Fonte: Gupy · Atualizado diariamente
-        </p>
+        {/* Footer informativo */}
+        <div
+          style={{
+            marginTop: '48px',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: '14px',
+          }}
+        >
+          <p style={{ fontSize: '11px', color: '#2e2e4a', letterSpacing: '0.2em', textTransform: 'uppercase', margin: 0 }}>
+            Fonte: Gupy · LinkedIn · Atualizado diariamente
+          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {linksFooter.map(({ label, id }, i) => (
+              <span key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {i > 0 && (
+                  <span style={{ color: '#2e2e4a', fontSize: '11px', userSelect: 'none' }}>·</span>
+                )}
+                <button
+                  onClick={() => setModalAberto(id)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: '11px', color: '#4a4a6a',
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    padding: '2px 0', transition: 'color 0.2s',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#A0AEC0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#4a4a6a')}
+                >
+                  {label}
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
 
       </div>
+
+      {/* Modais */}
+      {modalAberto === 'termos' && <TermosDeUso onClose={() => setModalAberto(null)} />}
+      {modalAberto === 'privacidade' && <PoliticaPrivacidade onClose={() => setModalAberto(null)} />}
+      {modalAberto === 'sobre' && <Sobre onClose={() => setModalAberto(null)} />}
+      {modalAberto === 'como-usar' && <ComoUsar onClose={() => setModalAberto(null)} />}
+      {modalAberto === 'como-funciona' && <ComoFunciona onClose={() => setModalAberto(null)} />}
+
     </PageTransition>
   );
 }
