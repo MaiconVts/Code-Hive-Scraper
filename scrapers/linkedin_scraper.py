@@ -434,7 +434,7 @@ class LinkedinScraper(BaseScraper):
     # CAMADA 7 — Normalização de Dados
     # ==================================================================
 
-    def _parse_localizacao(self, localizacao_raw: str) -> tuple:
+    def _parse_localizacao(self, localizacao_raw: str | None) -> tuple:
         """
         Separa localização LinkedIn em (city, state, country).
         "São Paulo, São Paulo, Brasil" → ("São Paulo", "São Paulo", "Brasil")
@@ -452,7 +452,7 @@ class LinkedinScraper(BaseScraper):
             return partes[0], partes[1], None
         return None, None, partes[0]
 
-    def _inferir_modalidade(self, localizacao_raw: str) -> str:
+    def _inferir_modalidade(self, localizacao_raw: str | None) -> str:
         """Infere modalidade a partir da localização (fallback quando filtro não se aplica)."""
         if not localizacao_raw:
             return 'Não informado'
@@ -464,7 +464,7 @@ class LinkedinScraper(BaseScraper):
 
         return 'Não informado'
 
-    def _normalizar_vaga(self, vaga_raw: dict, modalidade_explicita: str = None) -> dict:
+    def _normalizar_vaga(self, vaga_raw: dict, modalidade_explicita: str | None = None) -> dict:
         """
         Ponto único de conversão: dict bruto do parser → formato padronizado MyOrbita.
 
@@ -498,7 +498,7 @@ class LinkedinScraper(BaseScraper):
             is_remote=is_remote,
         )
 
-    def _extrair_vagas_da_pagina(self, html_content: bytes, modalidade_explicita: str = None) -> list:
+    def _extrair_vagas_da_pagina(self, html_content: bytes, modalidade_explicita: str | None = None) -> list:
         """Processa HTML de uma página e retorna vagas normalizadas."""
         cards = self._extrair_cards(html_content)
         vagas = []
@@ -512,7 +512,7 @@ class LinkedinScraper(BaseScraper):
     # CAMADA 8 — Request com Todas as Proteções
     # ==================================================================
 
-    def _montar_url(self, palavra_chave: str, offset: int = 0, f_wt: str = None) -> str:
+    def _montar_url(self, palavra_chave: str, offset: int = 0, f_wt: str | None = None) -> str:
         """
         Monta URL de busca do LinkedIn com paginação, geoId do Brasil e
         opcional filtro de modalidade (f_WT).

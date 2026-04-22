@@ -70,7 +70,7 @@ class BaseScraper(ABC):
             return valor if valor else default
         return valor
 
-    def _normalizar_estado(self, state_nome: str) -> str:
+    def _normalizar_estado(self, state_nome: str | None) -> str:
         """
         Converte nome completo do estado para sigla (UF).
         'São Paulo' → 'SP', 'Minas Gerais' → 'MG'
@@ -89,16 +89,16 @@ class BaseScraper(ABC):
         empresa: str,
         modalidade: str,
         link: str,
-        data_pub: str,
+        data_pub: str | None,
         # --- CAMPOS NOVOS (opcionais para não quebrar scrapers existentes) ---
-        city: str = None,
-        state: str = None,
-        country: str = None,
-        workplace_type: str = None,
-        is_remote: bool = None,
-        tipo_contrato: str = None,
-        prazo_inscricao: str = None,
-        pcd: bool = None,
+        city: str | None = None,
+        state: str | None = None,
+        country: str | None = None,
+        workplace_type: str | None = None,
+        is_remote: bool | None = None,
+        tipo_contrato: str | None = None,
+        prazo_inscricao: str | None = None,
+        pcd: bool | None = None,
     ) -> dict:
         """
         Monta o dicionário padronizado da vaga.
@@ -127,7 +127,7 @@ class BaseScraper(ABC):
             "pcd": self._normalizar_campo(pcd, default=False),
         }
 
-    def fazer_requisicao_segura(self, url: str, params: dict = None) -> requests.Response:
+    def fazer_requisicao_segura(self, url: str, params: dict | None = None) -> requests.Response:
         """
         Algoritmo Anti-Bloqueio: Exponential Backoff com Jitter.
         Evita bans permanentes (Rate Limiting) ao lidar com grandes volumes de dados.
@@ -172,3 +172,7 @@ class BaseScraper(ABC):
                 tempo_espera = (2 ** tentativa) + random.uniform(1, 2)
                 logger.warning(f"[ANTI-BAN]: Aguardando {tempo_espera:.2f}s — Tentativa {tentativa + 1}/{tentativas_maximas}")
                 time.sleep(tempo_espera)
+
+        # Inalcançável em runtime — a última iteração sempre retorna ou raise.
+        # Necessário para o type checker saber que a função nunca retorna None.
+        raise RuntimeError(f"fazer_requisicao_segura: todas as tentativas falharam para {url}")
