@@ -1,4 +1,4 @@
-# CLAUDE.md — MyOrbita
+﻿# CLAUDE.md — MyOrbita
 
 ## PAPEL E COMPORTAMENTO
 
@@ -263,13 +263,17 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [x] FASE 6.2 — Validar responsividade
 - [x] FASE 6.3 — Cache local no frontend (localStorage, TTL 1h) via `useCacheVagas` — isolado por rota, resiliente a erros, timestamp correto em hit parcial
 - [x] FASE 6.4 — Pull-to-refresh via `recarregar()` que invalida cache e re-fetcha do Firebase
-- [ ] FASE 6.5 — Testar em múltiplos navegadores (cross-browser)
+- [ ] FASE 6.5 — Testar em múltiplos navegadores (cross-browser) (Deixar para fase de testes automatizados)
 
 ### 📋 A fazer — Sprint 7 (Deploy)
-- [ ] FASE 7.1 — Termos de Uso (página dedicada + link no footer — LGPD/Play Store)
+- Criar uma seção no footer da pagina principal com quaisquer dessas telas mais "estaticas, informativas e explicativas aqui"
+  - cada uma terá sua próprio modal, acredito ficar mais condinzente e dinâmico com o projeto atual.
+- [ ] FASE 7.1 — Termos de Uso (LGPD/Play Store) Google Analytics e etc.
 - [ ] FASE 7.2 — Política de Privacidade (página dedicada + link no footer — LGPD/Play Store)
 - [ ] FASE 7.3 — Página Sobre (créditos e contexto)
 - [ ] FASE 7.4 — "Como usar" e "Como funciona" (hover dropdown no header web / modal mobile)
+
+
 - [ ] FASE 7.5 — Deploy via Vercel ou Firebase Hosting
 - [ ] FASE 7.6 — URL pública funcional + domínio (se aplicável)
 - [ ] FASE 7.7 — Monitoramento de cota do Firebase (alertas quando próximo do limite)
