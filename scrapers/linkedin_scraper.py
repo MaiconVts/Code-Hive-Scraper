@@ -158,8 +158,8 @@ class LinkedinScraper(BaseScraper):
         super().__init__(nome_plataforma="LinkedIn")
 
         # Estado da session
-        self._session: cffi_requests.Session | None = None
         self._session_aquecida: bool = False
+        self._iniciar_session()
 
         # Contadores para monitoramento
         self._requests_realizados: int = 0
@@ -182,8 +182,9 @@ class LinkedinScraper(BaseScraper):
         - Extensions TLS na mesma ordem que o Chrome
 
         Resultado: Cloudflare vê um Chrome real, não um bot Python.
+        Chamado no __init__ — session sempre existe, nunca é None.
         """
-        self._session = cffi_requests.Session(impersonate="chrome")
+        self._session: cffi_requests.Session = cffi_requests.Session(impersonate="chrome")
         self._session.headers.update(self._gerar_headers_base())
         logger.info("[LINKEDIN] Session curl_cffi criada com impersonate='chrome'")
 
@@ -627,9 +628,7 @@ class LinkedinScraper(BaseScraper):
         if self._circuit_breaker_aberto():
             return []
 
-        # Inicializa e aquece session na primeira chamada
-        if not self._session:
-            self._iniciar_session()
+        # Aquece session na primeira chamada (session já existe desde __init__)
         self._aquecer_session()
 
         # Verifica taxa de erro antes de cada keyword
