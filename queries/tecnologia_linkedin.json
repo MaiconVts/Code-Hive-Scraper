@@ -1,6 +1,6 @@
 {
   "configuracoes_gerais": {
-    "limite_vagas_por_pesquisa": 50,
+    "limite_vagas_por_pesquisa": 120,
     "plataformas_alvo": [
       "gupy"
     ]
