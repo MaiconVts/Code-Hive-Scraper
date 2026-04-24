@@ -132,8 +132,10 @@ class LinkedinScraper(BaseScraper):
     """
 
     # --- Limites de paginação ---
-    _VAGAS_POR_PAGINA = 25      # LinkedIn retorna 25 cards por página
-    _MAX_PAGINAS = 4            # Máximo 4 páginas por keyword (100 vagas)
+    # LinkedIn público retorna ~60 vagas por página (empiricamente medido no log).
+    # O valor 25 da documentação antiga só se aplicava à API autenticada.
+    _VAGAS_POR_PAGINA = 60
+    _MAX_PAGINAS = 4            # Máximo 4 páginas por keyword (~240 vagas)
 
     # --- Limites globais de segurança ---
     _MAX_REQUESTS_POR_EXECUCAO = 2000  # Teto absoluto de requests HTTP
@@ -145,9 +147,17 @@ class LinkedinScraper(BaseScraper):
     _DELAY_ENTRE_REQUESTS_DESVIO = 1.5  # Desvio padrão (±25% jitter natural)
     _DELAY_ENTRE_KEYWORDS_MEDIA = 8.0   # Cooldown entre palavras-chave diferentes
     _DELAY_ENTRE_KEYWORDS_DESVIO = 2.0
-    _PAUSA_LONGA_A_CADA = 50            # A cada N vagas, pausa longa
-    _PAUSA_LONGA_MEDIA = 45.0           # Média da pausa longa (segundos)
-    _PAUSA_LONGA_DESVIO = 10.0
+
+    # Pausa intermediária: simula humano que para pra ler resultados antes de
+    # paginar dentro da MESMA keyword. Gaussiana com clamp em [20, 30] — 95% dos
+    # valores caem naturalmente nessa faixa; clamp garante que ninguém saia fora.
+    # Reduzido de 45s → 25s: 45s era exagero, humano real não para 45s entre
+    # cliques de paginação (10-30s é o padrão real).
+    _PAUSA_INTERMEDIARIA_MEDIA = 25.0
+    _PAUSA_INTERMEDIARIA_DESVIO = 2.5
+    _PAUSA_INTERMEDIARIA_MIN = 20.0
+    _PAUSA_INTERMEDIARIA_MAX = 30.0
+
     _PAUSA_RECUPERACAO = 120.0          # 2 minutos de pausa se taxa de erro alta
 
     # geoId oficial do Brasil no LinkedIn — garante que só retorna vagas brasileiras.
@@ -281,6 +291,21 @@ class LinkedinScraper(BaseScraper):
         delay = random.gauss(media, desvio)
         delay = max(1.5, min(delay, media * 3))  # Clamp: [1.5s, media*3]
         time.sleep(delay)
+
+    def _delay_gaussiano_clampado(self, media: float, desvio: float, minimo: float, maximo: float) -> float:
+        """
+        Variante do delay gaussiano com clamp customizado [min, max].
+
+        Usado na pausa intermediária onde queremos garantir faixa estrita [20, 30]:
+        gauss(25, 2.5) tem ~95% dos valores naturalmente em [20, 30], e o clamp
+        captura os 5% restantes que poderiam sair da faixa.
+
+        Retorna o delay efetivamente aplicado (útil para logging).
+        """
+        delay = random.gauss(media, desvio)
+        delay = max(minimo, min(delay, maximo))
+        time.sleep(delay)
+        return delay
 
     # ==================================================================
     # CAMADA 4 — Detecção de Bloqueio (3 sinais)
@@ -621,6 +646,12 @@ class LinkedinScraper(BaseScraper):
         busca sem filtro e infere modalidade da localização (fallback).
 
         Retorna lista de dicts padronizados (15 chaves via padronizar_vaga).
+
+        Fluxo de pausas (otimizado):
+        - Entre requests da MESMA keyword: delay curto gaussiano (~6s)
+        - Entre páginas da MESMA keyword: pausa intermediária [20-30s]
+          (só ocorre se HOUVER próxima página — nunca após a última)
+        - Entre keywords diferentes: cooldown gaussiano (~8s)
         """
         # Guard clauses
         if self._limite_global_atingido():
@@ -639,7 +670,6 @@ class LinkedinScraper(BaseScraper):
         f_wt_code, modalidade_rotulo = F_WT_MAP.get(modalidade_normalizada, (None, None))
 
         todas_vagas = []
-        vagas_acumuladas_para_pausa = 0
 
         # Calcula páginas necessárias (respeitando teto)
         max_paginas = min(
@@ -648,7 +678,10 @@ class LinkedinScraper(BaseScraper):
         )
 
         for pagina in range(max_paginas):
-            offset = pagina * self._VAGAS_POR_PAGINA
+            # Offset do LinkedIn conta em unidades de ~25 na URL,
+            # mas o retorno real é ~60 por página. Mantemos 25 como incremento
+            # padrão da URL (empiricamente funciona — LinkedIn aceita qualquer offset).
+            offset = pagina * 25
             url = self._montar_url(palavra_chave, offset, f_wt=f_wt_code)
 
             response = self._fazer_request(url)
@@ -664,18 +697,28 @@ class LinkedinScraper(BaseScraper):
                 break
 
             todas_vagas.extend(vagas_pagina)
-            vagas_acumuladas_para_pausa += len(vagas_pagina)
 
             logger.info(
                 f"[LINKEDIN] Página {pagina + 1}: {len(vagas_pagina)} vagas "
                 f"(acumulado: {len(todas_vagas)})"
             )
 
-            # Pausa longa a cada N vagas (simula humano que para pra ler)
-            if vagas_acumuladas_para_pausa >= self._PAUSA_LONGA_A_CADA:
-                self._delay_gaussiano(self._PAUSA_LONGA_MEDIA, self._PAUSA_LONGA_DESVIO)
-                logger.info(f"[LINKEDIN] Pausa longa após {vagas_acumuladas_para_pausa} vagas")
-                vagas_acumuladas_para_pausa = 0
+            # Pausa intermediária: APENAS se houver próxima página.
+            # Motivo: depois da última página o próximo evento é mudança de keyword
+            # (nova URL, nova busca) — isso já é naturalmente um "momento de pausa".
+            # A pausa longa só protege o cenário "humano paginando a mesma busca".
+            eh_ultima_pagina = (pagina == max_paginas - 1)
+            if not eh_ultima_pagina:
+                delay_real = self._delay_gaussiano_clampado(
+                    self._PAUSA_INTERMEDIARIA_MEDIA,
+                    self._PAUSA_INTERMEDIARIA_DESVIO,
+                    self._PAUSA_INTERMEDIARIA_MIN,
+                    self._PAUSA_INTERMEDIARIA_MAX,
+                )
+                logger.info(
+                    f"[LINKEDIN] Pausa intermediária de {delay_real:.1f}s "
+                    f"antes da página {pagina + 2}"
+                )
 
         rotulo_log = modalidade_rotulo or 'todas'
         logger.info(f"[LINKEDIN] '{palavra_chave}' ({rotulo_log}): {len(todas_vagas)} vagas coletadas")
