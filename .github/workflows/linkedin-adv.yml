@@ -1,21 +1,23 @@
-name: Scraper LinkedIn
+name: Scraper LinkedIn — ADV
 
 on:
-  # Execução automática diária às 04:45 BRT (07:45 UTC)
-  # Roda ~1h depois da Gupy para garantir isolamento entre execuções.
+  # Execução automática diária às 12:00 BRT (15:00 UTC).
+  # Gap de ~7h15min após o workflow DEV (04:45 BRT) — tempo mais que
+  # suficiente para DEV finalizar (~2h40min) antes de ADV começar.
+  # Isolamento total: se DEV estourar o limite de 6h, ADV ainda roda.
   schedule:
-    - cron: '45 7 * * *'
+    - cron: '0 15 * * *'
   # Permite rodar manualmente via Actions → Run workflow
   workflow_dispatch:
 
 jobs:
   scrape:
-    name: Executar scraper LinkedIn
+    name: Executar scraper LinkedIn (ADV)
     runs-on: ubuntu-latest
 
-    # LinkedIn é scraping pesado com delays anti-ban (3-6s entre requests,
-    # pausas longas a cada 50 vagas, cooldown entre keywords).
-    # 120min cobre pior caso + margem para retries de circuit breaker.(retirado para testes iniciais, a ideia é rodar o scraper sem timeout e monitorar o tempo gasto para definir um timeout mais adequado)
+    # Categoria ADV é significativamente menor que DEV (~15-20 keywords
+    # vs 78 do DEV), então a duração esperada é bem inferior ao limite
+    # de 6h do GitHub Actions. Sem timeout-minutes explícito, usa o default.
 
     steps:
       - name: Checkout do repositório
@@ -37,16 +39,16 @@ jobs:
           mkdir -p secrets
           echo "$FIREBASE_CREDENTIALS" > secrets/firebase_key.json
 
-      - name: Executar scraper LinkedIn
+      - name: Executar scraper LinkedIn (ADV)
         env:
           FIREBASE_KEY_PATH: secrets/firebase_key.json
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
-        run: python main_linkedin.py
+        run: python main_linkedin_adv.py
 
       - name: Upload do log (sempre, mesmo em falha)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-linkedin-log
+          name: scraper-linkedin-adv-log
           path: scraper.log
           retention-days: 14
