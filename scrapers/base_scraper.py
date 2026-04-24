@@ -1,5 +1,6 @@
 # scrapers/base_scraper.py
 from abc import ABC, abstractmethod
+from typing import Any
 import requests
 import random
 import time
@@ -55,11 +56,24 @@ class BaseScraper(ABC):
         """
         pass
 
-    def _normalizar_campo(self, valor, default='Não informado'):
+    def _normalizar_campo(self, valor: Any, default: Any = 'Não informado') -> Any:
         """
-        Sanitiza qualquer campo de texto antes de salvar.
-        Trata None, strings vazias, e strings só com espaços.
-        Equivalente em C#: value?.Trim() ?? defaultValue
+        Sanitiza qualquer campo antes de salvar.
+
+        Comportamento polimórfico intencional:
+        - None                → retorna `default` (qualquer tipo)
+        - bool (True/False)   → retorna o próprio bool (sem strip)
+        - str vazia/espaços   → retorna `default`
+        - str válida          → retorna a string com strip aplicado
+        - qualquer outro tipo → retorna o valor cru
+
+        Por que Any nos tipos?
+        O método aceita e retorna múltiplos tipos de propósito — é chamado com
+        str, bool, e potencialmente outros. Anotar como Any comunica ao type
+        checker essa natureza polimórfica (equivalente ao `object?` do C# ou
+        ao generic method sem constraint).
+
+        Equivalente em C#: public T NormalizarCampo<T>(T valor, T defaultValue)
         """
         if valor is None:
             return default
