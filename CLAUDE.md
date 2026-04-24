@@ -272,11 +272,6 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [x] FASE 7.3 — Modal Sobre (`Sobre.tsx`) — autor, stack, fontes de dados
 - [x] FASE 7.4 — Modal Como Usar (`ComoUsar.tsx`) + Modal Como Funciona (`ComoFunciona.tsx`)
 
-### 📋 A fazer — Sprint 7 (Deploy)
-- [ ] FASE 7.5 — Deploy via Vercel ou Firebase Hosting
-- [ ] FASE 7.6 — URL pública funcional + domínio (se aplicável)
-- [ ] FASE 7.7 — Monitoramento de cota do Firebase (alertas quando próximo do limite)
-
 ### 📋 A fazer — Sprint 7.5 (Testes Automatizados)
 > Plano completo documentado em `PLANO_TESTES.md` na raiz do projeto.
 - [ ] FASE T1 — Testes unitários backend (pytest): normalização, mapeamentos, dedup, ID, contrato
@@ -285,6 +280,12 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 - [ ] FASE T4 — Testes unitários frontend (vitest): `useFiltrosVagas`, utilitários (formatarData, corPrazo, campoValido)
 - [ ] FASE T5 — Testes E2E (Playwright): responsividade, segurança, usabilidade, acessibilidade, performance, regressão visual, cross-browser
 - [ ] FASE T6 — Integrar testes ao GitHub Actions (CI)
+
+### 📋 A fazer — Sprint 7.2 (Deploy)
+- [ ] FASE 7.5 — Deploy via Vercel ou Firebase Hosting
+- [ ] FASE 7.6 — URL pública funcional + domínio (se aplicável)
+- [ ] FASE 7.7 — Monitoramento de cota do Firebase (alertas quando próximo do limite)
+
 
 ### 🚫 Bloqueado — Sprint 8 (Mobile)
 - [ ] FASE 8.1 — Ambiente Mobile (Configurar AVD + Expo Orbit)
