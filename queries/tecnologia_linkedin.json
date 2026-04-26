@@ -2,7 +2,7 @@
   "configuracoes_gerais": {
     "limite_vagas_por_pesquisa": 120,
     "plataformas_alvo": [
-      "gupy"
+      "linkedin"
     ]
   },
   "filtros_de_busca": {
@@ -13,15 +13,29 @@
       "Engenheiro de Software",
       "Arquiteto de Software",
       "Tech Lead",
-      
+
       "React",
       "React Native",
       "Angular",
       "Vue.js",
       "Svelte",
       "Node.js",
+
       "C#",
       ".NET",
+      "ASP.NET",
+      "Desenvolvedor .NET",
+      "Desenvolvedor C#",
+      "Programador .NET",
+      "Programador C#",
+      "Backend .NET",
+      "C# .NET",
+      "Analista .NET",
+      "Engenheiro .NET",
+      ".NET Core",
+      "Blazor",
+      "Xamarin",
+
       "Java",
       "Spring Boot",
       "Python",
@@ -36,17 +50,17 @@
       "C",
       "Rust",
       "Elixir",
-      
+
       "iOS",
       "Android",
       "Swift",
       "Kotlin",
       "Flutter",
-      
+
       "Desenvolvedor de Jogos",
       "Unity",
       "Unreal Engine",
-      
+
       "DevOps",
       "SRE",
       "SysAdmin",
@@ -58,7 +72,7 @@
       "Kubernetes",
       "Terraform",
       "Engenheiro de Redes",
-      
+
       "Engenheiro de Dados",
       "Cientista de Dados",
       "Analista de Dados",
@@ -67,25 +81,25 @@
       "DBA",
       "Engenheiro de IA",
       "Business Intelligence",
-      
+
       "QA",
       "Analista de Testes",
       "Engenheiro de Qualidade",
-      
+
       "Segurança da Informação",
       "Cibersegurança",
       "Pentester",
       "AppSec",
-      
+
       "Product Manager",
       "Product Owner",
       "Scrum Master",
       "Agilista",
-      
+
       "UX Designer",
       "UI Designer",
       "Product Designer",
-      
+
       "Estágio TI",
       "Estágio Desenvolvimento",
       "Trainee TI",
@@ -97,6 +111,6 @@
       "Remoto",
       "Híbrido",
       "Presencial"
-]
+    ]
   }
 }
