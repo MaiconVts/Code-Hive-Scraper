@@ -10,7 +10,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Mapa completo: Nome do estado → Sigla (UF)
-# Usado para padronizar o campo 'state' que a API Gupy retorna por extenso.
 ESTADOS_SIGLAS = {
     'Acre': 'AC', 'Alagoas': 'AL', 'Amapá': 'AP', 'Amazonas': 'AM',
     'Bahia': 'BA', 'Ceará': 'CE', 'Distrito Federal': 'DF',
@@ -24,9 +23,66 @@ ESTADOS_SIGLAS = {
 }
 
 # Status HTTP que NÃO fazem sentido tentar novamente.
-# 400 = request malformado, 403 = bloqueado, 404 = não existe.
-# Retry só vale pra 429 (rate limit) e 5xx (erro do servidor).
 STATUS_SEM_RETRY = {400, 403, 404}
+
+# ---------------------------------------------------------------------------
+# DETECÇÃO DE DOUBLE-ENCODING UTF-8 (Mojibake)
+# ---------------------------------------------------------------------------
+# Mojibake clássico ocorre quando bytes UTF-8 são interpretados como Latin-1
+# e depois reencodados como UTF-8. Ex: "Estágio" → "EstÃ¡gio".
+#
+# Estratégia de detecção: textos em português brasileiro NUNCA contêm:
+# - 'Ã' seguido de outro caractere com bit alto (Ã¡, Ã©, Ã­, Ã³, Ãº, Ãª, Ã§, Ã£)
+# - 'â€' (smart quotes mojibake)
+# - 'Â' isolado no meio de palavras
+#
+# Se detectar esses padrões, tenta o caminho reverso: encode latin-1 → decode utf-8.
+# Se der erro ou texto piorar, mantém original (defensivo).
+_PADROES_MOJIBAKE = (
+    'Ã¡', 'Ã©', 'Ã­', 'Ã³', 'Ãº',  # á é í ó ú
+    'Ãª', 'Ã´', 'Ã¢',                # ê ô â
+    'Ã§', 'Ã£', 'Ãµ',                # ç ã õ
+    'Ã‰', 'Ã“', 'Ã‚',                # É Ó Â (maiúsculas)
+    'â€"', 'â€™', 'â€œ', 'â€',       # smart quotes/dashes
+)
+
+
+def _texto_parece_mojibake(texto: str) -> bool:
+    """Testa se a string contém padrões clássicos de double-encoding."""
+    if not texto or len(texto) < 2:
+        return False
+    return any(padrao in texto for padrao in _PADROES_MOJIBAKE)
+
+
+def consertar_mojibake(texto: Any) -> Any:
+    """
+    Tenta reverter double-encoding UTF-8 (Mojibake).
+
+    Quando bytes UTF-8 corretos são interpretados como Latin-1 e reencodados,
+    cada caractere acentuado vira 2-3 caracteres "lixo". Esse processo é
+    REVERSÍVEL: encode('latin-1') → decode('utf-8') retorna o texto original.
+
+    Aplicada defensivamente em padronizar_vaga: se o scraper já entregou
+    texto correto, este método não altera nada (não bate em _PADROES_MOJIBAKE).
+    Se entregou texto corrompido, conserta antes de salvar no Firebase.
+
+    Não-strings (None, bool, int) passam direto.
+    """
+    if not isinstance(texto, str):
+        return texto
+    if not _texto_parece_mojibake(texto):
+        return texto
+
+    try:
+        # O fix: bytes que estavam mascarados como latin-1 voltam a ser UTF-8
+        consertado = texto.encode('latin-1').decode('utf-8')
+        # Validação: o texto consertado não deve ter mais padrões de mojibake
+        if not _texto_parece_mojibake(consertado):
+            return consertado
+        return texto  # piorou, mantém original
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        # Texto não é representável em latin-1 (já era UTF-8 puro com mojibake parcial)
+        return texto
 
 
 class BaseScraper(ABC):
@@ -50,10 +106,7 @@ class BaseScraper(ABC):
 
     @abstractmethod
     def buscar_vagas(self, palavra_chave: str, modalidade: str) -> list:
-        """
-        Método abstrato. Obriga as classes filhas (Gupy, LinkedIn, etc)
-        a implementarem sua própria lógica de busca na web ou API.
-        """
+        """Método abstrato — classes filhas implementam sua estratégia."""
         pass
 
     def _normalizar_campo(self, valor: Any, default: Any = 'Não informado') -> Any:
@@ -61,17 +114,11 @@ class BaseScraper(ABC):
         Sanitiza qualquer campo antes de salvar.
 
         Comportamento polimórfico intencional:
-        - None                → retorna `default` (qualquer tipo)
-        - bool (True/False)   → retorna o próprio bool (sem strip)
+        - None                → retorna `default`
+        - bool                → retorna o próprio bool (sem strip)
         - str vazia/espaços   → retorna `default`
-        - str válida          → retorna a string com strip aplicado
+        - str válida          → retorna a string com strip + conserto de mojibake
         - qualquer outro tipo → retorna o valor cru
-
-        Por que Any nos tipos?
-        O método aceita e retorna múltiplos tipos de propósito — é chamado com
-        str, bool, e potencialmente outros. Anotar como Any comunica ao type
-        checker essa natureza polimórfica (equivalente ao `object?` do C# ou
-        ao generic method sem constraint).
 
         Equivalente em C#: public T NormalizarCampo<T>(T valor, T defaultValue)
         """
@@ -81,20 +128,22 @@ class BaseScraper(ABC):
             return valor
         if isinstance(valor, str):
             valor = valor.strip()
-            return valor if valor else default
+            if not valor:
+                return default
+            # Rede de proteção: se algum scraper deixou passar texto corrompido,
+            # consertamos aqui antes de chegar no Firebase
+            return consertar_mojibake(valor)
         return valor
 
     def _normalizar_estado(self, state_nome: str | None) -> str:
         """
         Converte nome completo do estado para sigla (UF).
-        'São Paulo' → 'SP', 'Minas Gerais' → 'MG'
-        Se não encontrar no mapa, retorna o valor original (pode ser sigla já).
-        Se vazio/None, retorna 'Não informado'.
+        Aplica conserto de mojibake antes de buscar no mapa.
         """
         if not state_nome or not state_nome.strip():
             return 'Não informado'
-        state_nome = state_nome.strip()
-        return ESTADOS_SIGLAS.get(state_nome, state_nome)
+        state_consertado: str = consertar_mojibake(state_nome.strip())
+        return ESTADOS_SIGLAS.get(state_consertado, state_consertado)
 
     def padronizar_vaga(
         self,
@@ -104,7 +153,6 @@ class BaseScraper(ABC):
         modalidade: str,
         link: str,
         data_pub: str | None,
-        # --- CAMPOS NOVOS (opcionais para não quebrar scrapers existentes) ---
         city: str | None = None,
         state: str | None = None,
         country: str | None = None,
@@ -116,21 +164,17 @@ class BaseScraper(ABC):
     ) -> dict:
         """
         Monta o dicionário padronizado da vaga.
-        Complexidade de Tempo: O(1) para a criação do registro.
-
-        Parâmetros novos usam default None — scrapers antigos continuam
-        funcionando sem passar esses valores (não quebra assinatura).
-        O _normalizar_campo trata None/vazio antes de salvar.
+        Todos os campos textuais passam por _normalizar_campo (que aplica
+        conserto de mojibake automaticamente).
         """
         return {
             "id": id_vaga,
-            "titulo": titulo,
-            "empresa": empresa,
-            "modalidade": modalidade,
-            "link": link,
+            "titulo": consertar_mojibake(titulo),
+            "empresa": consertar_mojibake(empresa),
+            "modalidade": consertar_mojibake(modalidade),
+            "link": link,  # URL não tem mojibake (já é ASCII após URL-encoding)
             "data_publicacao": data_pub,
             "origem": self.nome_plataforma,
-            # --- CAMPOS NOVOS ---
             "city": self._normalizar_campo(city),
             "state": self._normalizar_estado(state),
             "country": self._normalizar_campo(country, default='Brasil'),
@@ -144,36 +188,35 @@ class BaseScraper(ABC):
     def fazer_requisicao_segura(self, url: str, params: dict | None = None) -> requests.Response:
         """
         Algoritmo Anti-Bloqueio: Exponential Backoff com Jitter.
-        Evita bans permanentes (Rate Limiting) ao lidar com grandes volumes de dados.
 
-        Retry seletivo:
-        - 429 (Rate Limit) e 5xx (erro servidor) → tenta novamente com backoff
-        - 400, 403, 404 → aborta imediatamente (retry não resolve)
+        Diferencial UTF-8: força encoding UTF-8 no response antes de retornar,
+        impedindo que .json() ou .text decodifiquem como Latin-1 (default do
+        requests quando o servidor não envia charset explícito).
         """
         tentativas_maximas = 4
 
         for tentativa in range(tentativas_maximas):
             try:
-                # Simula o delay humano de leitura antes de fazer a requisição (Jitter)
                 delay_humano = random.uniform(1.5, 3.5)
                 time.sleep(delay_humano)
 
                 response = requests.get(url, headers=self.headers_padrao, params=params, timeout=15)
 
-                # Sucesso — retorna direto
+                # ⚠️ FIX UTF-8: força encoding antes de qualquer decodificação.
+                # Servidores que mandam JSON sem charset no Content-Type fazem
+                # `requests` assumir Latin-1 (RFC 7159 antigo) — origem do mojibake.
+                response.encoding = 'utf-8'
+
                 if response.status_code == 200:
                     return response
 
-                # Erro sem chance de recovery — aborta sem gastar tentativas
                 if response.status_code in STATUS_SEM_RETRY:
                     logger.warning(f"HTTP {response.status_code} para {url} — abortando (retry inútil)")
                     return response
 
-                # Rate limit — aplica backoff
                 if response.status_code == 429:
                     raise requests.exceptions.RequestException("Rate Limit Excedido (HTTP 429)")
 
-                # Outros erros (5xx) — tenta novamente
                 response.raise_for_status()
                 return response
 
@@ -182,11 +225,8 @@ class BaseScraper(ABC):
                     logger.error(f"[FALHA CRÍTICA]: Limite de tentativas excedido para {url}. Erro: {e}")
                     raise e
 
-                # Exponential Backoff: (2, 4, 8 segundos) + Jitter de 1 a 2 segundos
                 tempo_espera = (2 ** tentativa) + random.uniform(1, 2)
                 logger.warning(f"[ANTI-BAN]: Aguardando {tempo_espera:.2f}s — Tentativa {tentativa + 1}/{tentativas_maximas}")
                 time.sleep(tempo_espera)
 
-        # Inalcançável em runtime — a última iteração sempre retorna ou raise.
-        # Necessário para o type checker saber que a função nunca retorna None.
         raise RuntimeError(f"fazer_requisicao_segura: todas as tentativas falharam para {url}")
