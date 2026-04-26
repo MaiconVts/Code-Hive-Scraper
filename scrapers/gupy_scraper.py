@@ -1,4 +1,3 @@
-import requests
 import logging
 from .base_scraper import BaseScraper
 
@@ -26,10 +25,7 @@ class GupyScraper(BaseScraper):
         return "remote"
 
     def _mapear_tipo_contrato(self, tipo_api: str) -> str:
-        """
-        Traduz o campo 'type' da API Gupy para português legível.
-        Ex: 'vacancy_type_effective' → 'CLT'
-        """
+        """Traduz o campo 'type' da API Gupy para português legível."""
         mapa = {
             'vacancy_type_effective': 'CLT',
             'vacancy_type_internship': 'Estágio',
@@ -49,11 +45,7 @@ class GupyScraper(BaseScraper):
         return mapa.get(tipo_api, tipo_api or 'Não informado')
 
     def _mapear_workplace_legivel(self, workplace: str) -> str:
-        """
-        Traduz o workplaceType retornado pela API para português.
-        Diferente do _mapear_modalidade — aqui convertemos o RETORNO da API,
-        não o parâmetro de busca.
-        """
+        """Traduz o workplaceType retornado pela API para português."""
         mapa = {
             'remote': 'Remoto',
             'hybrid': 'Híbrido',
@@ -61,11 +53,28 @@ class GupyScraper(BaseScraper):
         }
         return mapa.get(workplace, workplace or 'Não informado')
 
+    def _decodificar_json_utf8(self, response) -> dict | list:
+        """
+        Decodifica JSON forçando UTF-8 nos bytes crus.
+
+        Por que não usar response.json() diretamente?
+        A lib `requests` decodifica usando o charset do Content-Type. Se o
+        servidor não enviar charset, ela ASSUME Latin-1 — gerando mojibake
+        em strings com acentos. Mesmo com response.encoding = 'utf-8' setado
+        no base_scraper, .json() pode ignorar isso em algumas versões.
+        Decodificar bytes manualmente garante UTF-8 puro.
+        """
+        import json
+        try:
+            # Decodifica bytes crus como UTF-8 (garantido)
+            texto = response.content.decode('utf-8')
+            return json.loads(texto)
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            logger.warning(f"[GUPY] Falha decodificando UTF-8: {e}. Tentando response.json() como fallback.")
+            return response.json()
+
     def _extrair_vagas_da_pagina(self, lista_resultados: list) -> list:
-        """
-        Processa uma página de resultados da API e retorna vagas padronizadas.
-        Método extraído para evitar duplicação entre primeira página e paginação.
-        """
+        """Processa uma página de resultados da API e retorna vagas padronizadas."""
         vagas = []
 
         for item in lista_resultados:
@@ -73,6 +82,9 @@ class GupyScraper(BaseScraper):
             if not link:
                 continue
 
+            # padronizar_vaga (do BaseScraper) já aplica consertar_mojibake
+            # automaticamente em titulo/empresa/modalidade — protege mesmo que
+            # algum byte UTF-8 tenha vazado mal-decodificado.
             vaga = self.padronizar_vaga(
                 id_vaga=self.gerar_id_deterministico(link),
                 titulo=item.get('name', 'Título não informado'),
@@ -96,9 +108,11 @@ class GupyScraper(BaseScraper):
     def buscar_vagas(self, palavra_chave: str, modalidade: str, limite: int = 50) -> list:
         """
         Implementação obrigatória do método de busca.
-        Agora com paginação inteligente: se a API reporta mais vagas do que
-        o limite por página, faz requests adicionais incrementando o offset.
-        O delay anti-ban do fazer_requisicao_segura continua ativo entre cada request.
+
+        Paginação inteligente: se a API reporta mais vagas do que o limite
+        por página, faz requests adicionais incrementando o offset.
+        Decodificação JSON forçada como UTF-8 para evitar mojibake em
+        títulos/empresas com acentos.
         """
         url = "https://employability-portal.gupy.io/api/v1/jobs"
         tipo_trabalho = self._mapear_modalidade(modalidade)
@@ -114,23 +128,21 @@ class GupyScraper(BaseScraper):
             # --- Primeira página ---
             response = self.fazer_requisicao_segura(url, params=parametros)
 
-            # Se não for 200 (ex: 403, 404), retorna vazio sem quebrar
             if response.status_code != 200:
                 logger.warning(f"HTTP {response.status_code} para '{palavra_chave}' + '{modalidade}'")
                 return []
 
-            dados = response.json()
+            # ⚠️ FIX UTF-8: decodifica via bytes em vez de response.json()
+            dados = self._decodificar_json_utf8(response)
             lista_resultados = dados.get('data', []) if isinstance(dados, dict) else dados
             todas_vagas = self._extrair_vagas_da_pagina(lista_resultados)
 
-            # --- Paginação: se há mais vagas além desta página ---
-            total_disponivel = dados.get('pagination', {}).get('total', 0)
+            # --- Paginação ---
+            total_disponivel = dados.get('pagination', {}).get('total', 0) if isinstance(dados, dict) else 0
 
             if total_disponivel > limite:
                 paginas_restantes = (total_disponivel - limite + limite - 1) // limite
-                # Teto de segurança: máximo 10 páginas extras (500 vagas por query)
-                # Evita loops infinitos se a API reportar total absurdo
-                paginas_restantes = min(paginas_restantes, 10)
+                paginas_restantes = min(paginas_restantes, 10)  # teto de segurança
 
                 logger.info(f"Paginando '{palavra_chave}' ({modalidade}): {total_disponivel} vagas, {paginas_restantes} páginas extras")
 
@@ -142,11 +154,11 @@ class GupyScraper(BaseScraper):
                         logger.warning(f"Paginação interrompida na página {pagina + 1} — HTTP {response.status_code}")
                         break
 
-                    dados_pagina = response.json()
+                    dados_pagina = self._decodificar_json_utf8(response)
                     resultados_pagina = dados_pagina.get('data', []) if isinstance(dados_pagina, dict) else dados_pagina
 
                     if not resultados_pagina:
-                        break  # API retornou página vazia — não há mais vagas
+                        break
 
                     vagas_pagina = self._extrair_vagas_da_pagina(resultados_pagina)
                     todas_vagas.extend(vagas_pagina)
