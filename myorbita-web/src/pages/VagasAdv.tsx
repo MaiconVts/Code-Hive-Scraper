@@ -11,23 +11,39 @@ import {
   SlidersHorizontal,
   Layers,
   RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import type { IVaga } from "../types/IVaga";
 import { ROUTES } from "../constants/routes";
 import VagaDetalhe from "../components/VagaDetalhe";
 import PageTransition from "../components/PageTransition";
+import FiltroMultiSelect, { type OpcaoMultiSelect } from "../components/FiltroMultiSelect";
 import { useFiltrosVagas } from "../hooks/useFiltrosVagas";
 import { useCacheVagas } from "../hooks/useCacheVagas";
 
+// =====================================================================
+// Helper local — mesma lógica do hook, duplicado intencionalmente
+// para desacoplamento.
+// =====================================================================
+const VALORES_AUSENTES = new Set(["", "Não informado", "Brasil"]);
+
+const estaAusente = (valor?: string): boolean => {
+  if (!valor) return true;
+  return VALORES_AUSENTES.has(valor.trim());
+};
+
+// =====================================================================
+// Cores — paleta âmbar/dourada para diferenciar de DEV (ciano)
+// =====================================================================
 const modalidadeCor: Record<string, string> = {
-  Remoto: "#4FC3F7",
-  Híbrido: "#FFB703",
+  Remoto: "#FFB703",
+  Híbrido: "#4FC3F7",
   Presencial: "#A0AEC0",
 };
 
 const contratoCor: Record<string, string> = {
-  CLT: "#4FC3F7",
-  PJ: "#FFB703",
+  CLT: "#FFB703",
+  PJ: "#4FC3F7",
   Estágio: "#A78BFA",
   "Jovem Aprendiz": "#34D399",
   Temporário: "#F87171",
@@ -37,11 +53,24 @@ const contratoCor: Record<string, string> = {
 };
 
 const origemCor: Record<string, string> = {
-  Gupy: "#4FC3F7",
+  Gupy: "#FFB703",
   LinkedIn: "#0077B5",
 };
 
-const PLATAFORMAS_CANONICAS = ["Gupy", "LinkedIn"] as const;
+const COR_AUSENTE = "#6b7280";
+
+const OPCOES_NIVEL: OpcaoMultiSelect[] = [
+  { value: "estagio", label: "Estágio" },
+  { value: "junior", label: "Júnior" },
+  { value: "pleno", label: "Pleno" },
+  { value: "senior", label: "Sênior" },
+];
+
+const OPCOES_MODALIDADE: OpcaoMultiSelect[] = [
+  { value: "Remoto", label: "Remoto", cor: modalidadeCor.Remoto },
+  { value: "Híbrido", label: "Híbrido", cor: modalidadeCor.Híbrido },
+  { value: "Presencial", label: "Presencial", cor: modalidadeCor.Presencial },
+];
 
 const ROTAS_ADV = [
   ROUTES.FIREBASE_VAGAS_ADV_GUPY,
@@ -70,12 +99,29 @@ function formatarTempoRelativo(timestamp: number | null): string {
   if (!timestamp) return "";
   const diffMs = Date.now() - timestamp;
   const diffMin = Math.floor(diffMs / 60000);
+
   if (diffMin < 1) return "agora mesmo";
   if (diffMin < 60) return `há ${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `há ${diffH}h`;
   const diffD = Math.floor(diffH / 24);
   return `há ${diffD}d`;
+}
+
+function formatarLocalizacao(city?: string, state?: string): { texto: string; ausente: boolean } {
+  const cityValido = !estaAusente(city);
+  const stateValido = !estaAusente(state);
+
+  if (!cityValido && !stateValido) {
+    return { texto: "Local não informado", ausente: true };
+  }
+  if (cityValido && stateValido) {
+    return { texto: `${city}, ${state}`, ausente: false };
+  }
+  if (cityValido) {
+    return { texto: city!, ausente: false };
+  }
+  return { texto: state!, ausente: false };
 }
 
 const selectBase: React.CSSProperties = {
@@ -91,13 +137,13 @@ export default function VagasAdv() {
 
   const {
     busca, setBusca,
-    filtroModalidade, setFiltroModalidade,
     ordenacao, setOrdenacao,
-    filtroEstado, setFiltroEstado,
-    filtroNivel, setFiltroNivel,
-    filtroContrato, setFiltroContrato,
+    filtrosModalidade, setFiltrosModalidade,
+    filtrosNivel, setFiltrosNivel,
+    filtrosEstado, setFiltrosEstado,
+    filtrosContrato, setFiltrosContrato,
+    filtrosOrigem, setFiltrosOrigem,
     filtroPcd, setFiltroPcd,
-    filtroOrigem, setFiltroOrigem,
     estadosDisponiveis,
     contratosDisponiveis,
     origensDisponiveis,
@@ -105,6 +151,24 @@ export default function VagasAdv() {
     vagasFiltradas, vagasPagina, totalPaginas, paginasVisiveis,
     filtrosAtivos, totalFiltrosAtivos, limparFiltros,
   } = useFiltrosVagas(vagasRaw);
+
+  const opcoesEstado: OpcaoMultiSelect[] = estadosDisponiveis.map((uf) => ({
+    value: uf,
+    label: uf,
+  }));
+
+  const opcoesContrato: OpcaoMultiSelect[] = contratosDisponiveis.map((tipo) => ({
+    value: tipo,
+    label: tipo,
+  }));
+
+  const toggleOrigem = (origem: string) => {
+    if (filtrosOrigem.includes(origem)) {
+      setFiltrosOrigem(filtrosOrigem.filter((o) => o !== origem));
+    } else {
+      setFiltrosOrigem([...filtrosOrigem, origem]);
+    }
+  };
 
   return (
     <PageTransition>
@@ -136,12 +200,6 @@ export default function VagasAdv() {
           }
         }
 
-        .toggles-modalidade {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-        }
-
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -155,7 +213,7 @@ export default function VagasAdv() {
         className="min-h-screen w-full flex flex-col items-center pb-16 px-4 sm:px-6 lg:px-8"
         style={{
           fontFamily: "'Space Grotesk', sans-serif",
-          marginTop: '64px',
+          marginTop: "64px",
           overflowX: "hidden",
         }}
       >
@@ -164,8 +222,8 @@ export default function VagasAdv() {
 
           {/* Hero */}
           <div className="text-center w-full py-6">
-            <p className="text-[11px] text-[#FFB703] tracking-[0.3em] uppercase mb-3">
-              Direito & Advocacia
+            <p className="text-[11px] text-[#FFB703] tracking-[0.3em] uppercase mb-3 mt-6">
+              Advocacia & Jurídico
             </p>
             <h1
               className="text-[42px] sm:text-[52px] font-bold text-white mb-3"
@@ -177,7 +235,9 @@ export default function VagasAdv() {
               Vagas Jurídico
             </h1>
             <p className="text-[14px] text-[#A0AEC0]">
-              {carregando ? "Carregando vagas..." : `${vagasFiltradas.length} vagas disponíveis agora`}
+              {carregando
+                ? "Carregando vagas..."
+                : `${vagasFiltradas.length} vagas disponíveis agora`}
             </p>
           </div>
 
@@ -194,7 +254,6 @@ export default function VagasAdv() {
               minWidth: 0,
             }}
           >
-            {/* Cabeçalho: título + contador + atualizar + limpar */}
             <div className="flex items-center justify-between gap-3 flex-wrap w-full">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <SlidersHorizontal size={16} color="#A0AEC0" />
@@ -249,13 +308,12 @@ export default function VagasAdv() {
               </div>
             </div>
 
-            {/* Linha: Busca + Modalidade + Ordenação */}
             <div className="linha-busca">
               <div className="relative flex items-center flex-1" style={{ minWidth: 0 }}>
                 <Search className="absolute left-4" size={16} color="#FFB703" style={{ pointerEvents: "none" }} />
                 <input
                   type="text"
-                  placeholder="Ex: Advogado Trabalhista Sênior"
+                  placeholder="Ex: Advogado Trabalhista Pleno"
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   className="w-full h-[44px] text-[14px] text-white placeholder-[#A0AEC0] outline-none transition-all"
@@ -272,27 +330,13 @@ export default function VagasAdv() {
                 />
               </div>
 
-              <div
-                className="toggles-modalidade p-1.5 rounded-[12px] shrink-0"
-                style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)" }}
-              >
-                {["Remoto", "Híbrido", "Presencial"].map((f) => {
-                  const isActive = filtroModalidade === f;
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => setFiltroModalidade(isActive ? null : f)}
-                      className="px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
-                      style={{
-                        background: isActive ? "#FFB703" : "transparent",
-                        color: isActive ? "#050015" : "#A0AEC0",
-                        fontWeight: isActive ? 600 : 500,
-                      }}
-                    >
-                      {f}
-                    </button>
-                  );
-                })}
+              <div style={{ width: "200px", flexShrink: 0 }}>
+                <FiltroMultiSelect
+                  placeholder="Modalidade"
+                  opcoes={OPCOES_MODALIDADE}
+                  selecionados={filtrosModalidade}
+                  onChange={setFiltrosModalidade}
+                />
               </div>
 
               <select
@@ -306,7 +350,7 @@ export default function VagasAdv() {
               </select>
             </div>
 
-            {/* Linha destacada: Plataforma — sempre visível */}
+            {/* Plataforma */}
             <div
               className="flex flex-col gap-2 w-full"
               style={{
@@ -321,101 +365,73 @@ export default function VagasAdv() {
                 <span className="text-[11px] text-[#FFB703] font-semibold uppercase tracking-wider">
                   Plataforma
                 </span>
+                {filtrosOrigem.length > 0 && (
+                  <span className="text-[10px] text-[#FFB703] opacity-70">
+                    ({filtrosOrigem.length} {filtrosOrigem.length === 1 ? "selecionada" : "selecionadas"})
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setFiltroOrigem("todas")}
-                  className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
-                  style={{
-                    background: filtroOrigem === "todas" ? "#FFB703" : "rgba(0,0,0,0.2)",
-                    color: filtroOrigem === "todas" ? "#050015" : "#A0AEC0",
-                    fontWeight: filtroOrigem === "todas" ? 600 : 500,
-                    border: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  Todas
-                </button>
-
-                {PLATAFORMAS_CANONICAS.map((origem) => {
-                  const disponivel = origensDisponiveis.includes(origem);
-                  const isActive = filtroOrigem === origem;
+                {origensDisponiveis.map((origem) => {
+                  const isActive = filtrosOrigem.includes(origem);
                   const cor = origemCor[origem] ?? "#94A3B8";
 
                   return (
                     <button
                       key={origem}
-                      onClick={() => disponivel && setFiltroOrigem(origem)}
-                      disabled={!disponivel}
+                      onClick={() => toggleOrigem(origem)}
                       title={
-                        disponivel
-                          ? `Mostrar apenas vagas do ${origem}`
-                          : `Ainda não há vagas do ${origem} nesta categoria`
+                        isActive
+                          ? `Remover filtro do ${origem}`
+                          : `Adicionar vagas do ${origem}`
                       }
                       className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
                       style={{
                         background: isActive ? cor : "rgba(0,0,0,0.2)",
-                        color: isActive ? "#050015" : disponivel ? "#A0AEC0" : "#4a4a6a",
+                        color: isActive ? "#050015" : "#A0AEC0",
                         fontWeight: isActive ? 600 : 500,
-                        border: `1px solid ${disponivel ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)"}`,
-                        cursor: disponivel ? "pointer" : "not-allowed",
-                        opacity: disponivel ? 1 : 0.45,
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        cursor: "pointer",
                       }}
                     >
                       {origem}
                     </button>
                   );
                 })}
+
+                {filtrosOrigem.length === 0 && (
+                  <span className="text-[11px] text-[#6b7280] italic ml-1">
+                    Nenhum filtro = todas as plataformas
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Grid: Nível + Estado + Contrato + PCD */}
             <div className="filtros-grid">
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <GraduationCap className="absolute left-3 pointer-events-none" size={15} color="#A0AEC0" />
-                <select
-                  value={filtroNivel}
-                  onChange={(e) => setFiltroNivel(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "36px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Nível</option>
-                  <option value="estagio" style={{ color: "#050015" }}>Estágio</option>
-                  <option value="junior" style={{ color: "#050015" }}>Júnior</option>
-                  <option value="pleno" style={{ color: "#050015" }}>Pleno</option>
-                  <option value="senior" style={{ color: "#050015" }}>Sênior</option>
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<GraduationCap size={15} />}
+                placeholder="Qualquer Nível"
+                opcoes={OPCOES_NIVEL}
+                selecionados={filtrosNivel}
+                onChange={setFiltrosNivel}
+              />
 
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <MapPin className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
-                <select
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Estado</option>
-                  {estadosDisponiveis.map((uf) => (
-                    <option key={uf} value={uf} style={{ color: "#050015" }}>{uf}</option>
-                  ))}
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<MapPin size={14} />}
+                placeholder="Qualquer Estado"
+                opcoes={opcoesEstado}
+                selecionados={filtrosEstado}
+                onChange={setFiltrosEstado}
+              />
 
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <Briefcase className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
-                <select
-                  value={filtroContrato}
-                  onChange={(e) => setFiltroContrato(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Contrato</option>
-                  {contratosDisponiveis.map((tipo) => (
-                    <option key={tipo} value={tipo} style={{ color: "#050015" }}>{tipo}</option>
-                  ))}
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<Briefcase size={14} />}
+                placeholder="Qualquer Contrato"
+                opcoes={opcoesContrato}
+                selecionados={filtrosContrato}
+                onChange={setFiltrosContrato}
+              />
 
               <button
                 onClick={() => setFiltroPcd(!filtroPcd)}
@@ -433,7 +449,6 @@ export default function VagasAdv() {
               </button>
             </div>
 
-            {/* Chips de filtros ativos */}
             {totalFiltrosAtivos > 0 && (
               <div
                 className="flex flex-wrap gap-2 pt-3 w-full"
@@ -522,12 +537,21 @@ export default function VagasAdv() {
           {!carregando && vagasPagina.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
               {vagasPagina.map((vaga) => {
-                const corMod = modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
-                const corCont = contratoCor[vaga.tipo_contrato || ""] ?? "#94A3B8";
+                const modalidadeAusente = estaAusente(vaga.modalidade);
+                const contratoAusente = estaAusente(vaga.tipo_contrato);
+                const localizacao = formatarLocalizacao(vaga.city, vaga.state);
+
+                const corMod = modalidadeAusente
+                  ? COR_AUSENTE
+                  : modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
+                const corCont = contratoAusente
+                  ? COR_AUSENTE
+                  : contratoCor[vaga.tipo_contrato ?? ""] ?? "#94A3B8";
                 const corOri = origemCor[vaga.origem] ?? "#94A3B8";
-                const temLocal = vaga.city && vaga.city !== "Não informado";
-                const prazo = vaga.prazo_inscricao && vaga.prazo_inscricao !== "Não informado"
-                  ? corPrazo(vaga.prazo_inscricao) : null;
+
+                const prazo = vaga.prazo_inscricao && !estaAusente(vaga.prazo_inscricao)
+                  ? corPrazo(vaga.prazo_inscricao)
+                  : null;
 
                 return (
                   <div
@@ -560,10 +584,17 @@ export default function VagasAdv() {
                         {vaga.titulo}
                       </h3>
                       <span
-                        className="text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                        style={{ background: `${corMod}15`, color: corMod, border: `1px solid ${corMod}30` }}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 flex items-center gap-1"
+                        style={{
+                          background: `${corMod}15`,
+                          color: corMod,
+                          border: `1px solid ${corMod}30`,
+                          fontStyle: modalidadeAusente ? "italic" : "normal",
+                        }}
+                        title={modalidadeAusente ? "Modalidade não informada na vaga original" : undefined}
                       >
-                        {vaga.modalidade}
+                        {modalidadeAusente && <AlertCircle size={10} />}
+                        {modalidadeAusente ? "Modalidade não informada" : vaga.modalidade}
                       </span>
                     </div>
 
@@ -586,20 +617,32 @@ export default function VagasAdv() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 mb-4">
-                      {temLocal && (
-                        <span className="text-[11px] text-[#A0AEC0] flex items-center gap-1">
-                          <MapPin size={11} />
-                          {vaga.city}{vaga.state && vaga.state !== "Não informado" ? `, ${vaga.state}` : ""}
-                        </span>
-                      )}
-                      {vaga.tipo_contrato && vaga.tipo_contrato !== "Não informado" && (
-                        <span
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: `${corCont}15`, color: corCont, border: `1px solid ${corCont}30` }}
-                        >
-                          {vaga.tipo_contrato}
-                        </span>
-                      )}
+                      <span
+                        className="text-[11px] flex items-center gap-1"
+                        style={{
+                          color: localizacao.ausente ? COR_AUSENTE : "#A0AEC0",
+                          fontStyle: localizacao.ausente ? "italic" : "normal",
+                        }}
+                        title={localizacao.ausente ? "Localização não informada na vaga original" : undefined}
+                      >
+                        {localizacao.ausente ? <AlertCircle size={11} /> : <MapPin size={11} />}
+                        {localizacao.texto}
+                      </span>
+
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
+                        style={{
+                          background: `${corCont}15`,
+                          color: corCont,
+                          border: `1px solid ${corCont}30`,
+                          fontStyle: contratoAusente ? "italic" : "normal",
+                        }}
+                        title={contratoAusente ? "Tipo de contrato não informado na vaga original" : undefined}
+                      >
+                        {contratoAusente && <AlertCircle size={10} />}
+                        {contratoAusente ? "Contrato não informado" : vaga.tipo_contrato}
+                      </span>
+
                       {vaga.pcd && (
                         <span
                           className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
@@ -635,7 +678,11 @@ export default function VagasAdv() {
                 onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
                 disabled={paginaAtual === 1}
                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-all"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", color: paginaAtual === 1 ? "#4a4a6a" : "#A0AEC0" }}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  color: paginaAtual === 1 ? "#4a4a6a" : "#A0AEC0",
+                }}
               >
                 <ChevronLeft size={18} />
               </button>
@@ -645,8 +692,8 @@ export default function VagasAdv() {
                   onClick={() => setPaginaAtual(p)}
                   className="w-10 h-10 flex items-center justify-center text-[14px] rounded-xl transition-all"
                   style={{
-                    background: paginaAtual === p ? "#FFB703" : "rgba(255,255,255,0.03)",
-                    border: paginaAtual === p ? "1px solid #FFB703" : "1px solid rgba(255,255,255,0.05)",
+                    background: paginaAtual === p ? "#4FC3F7" : "rgba(255,255,255,0.03)",
+                    border: paginaAtual === p ? "1px solid #4FC3F7" : "1px solid rgba(255,255,255,0.05)",
                     color: paginaAtual === p ? "#050015" : "#A0AEC0",
                     fontWeight: paginaAtual === p ? 700 : 500,
                   }}
@@ -658,7 +705,11 @@ export default function VagasAdv() {
                 onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
                 disabled={paginaAtual === totalPaginas}
                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-all"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", color: paginaAtual === totalPaginas ? "#4a4a6a" : "#A0AEC0" }}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  color: paginaAtual === totalPaginas ? "#4a4a6a" : "#A0AEC0",
+                }}
               >
                 <ChevronRight size={18} />
               </button>
@@ -668,16 +719,23 @@ export default function VagasAdv() {
           {/* Rodapé */}
           {!carregando && (
             <div className="w-full mt-auto pt-8 flex flex-col sm:flex-row items-center justify-between border-t border-[rgba(255,255,255,0.05)] gap-4 text-center sm:text-left">
-              <p className="text-[13px] text-[#A0AEC0]">Atualizado via Gupy + LinkedIn</p>
+              <p className="text-[13px] text-[#A0AEC0]">
+                Atualizado via Gupy + LinkedIn
+              </p>
               <div
                 className="px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-2"
-                style={{ background: "rgba(255,183,3,0.1)", border: "1px solid rgba(255,183,3,0.2)", color: "#FFB703" }}
+                style={{
+                  background: "rgba(255,183,3,0.1)",
+                  border: "1px solid rgba(255,183,3,0.2)",
+                  color: "#FFB703",
+                }}
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFB703] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFB703]"></span>
                 </span>
-                {vagasFiltradas.length} {vagasFiltradas.length === 1 ? "vaga encontrada" : "vagas encontradas"}
+                {vagasFiltradas.length}{" "}
+                {vagasFiltradas.length === 1 ? "vaga encontrada" : "vagas encontradas"}
               </div>
             </div>
           )}

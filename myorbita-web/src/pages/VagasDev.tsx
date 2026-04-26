@@ -11,14 +11,32 @@ import {
   SlidersHorizontal,
   Layers,
   RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import type { IVaga } from "../types/IVaga";
 import { ROUTES } from "../constants/routes";
 import VagaDetalhe from "../components/VagaDetalhe";
 import PageTransition from "../components/PageTransition";
+import FiltroMultiSelect, { type OpcaoMultiSelect } from "../components/FiltroMultiSelect";
 import { useFiltrosVagas } from "../hooks/useFiltrosVagas";
 import { useCacheVagas } from "../hooks/useCacheVagas";
 
+// =====================================================================
+// Helper local — duplicado intencionalmente do hook para desacoplar.
+// Se um dia o conjunto de "valores ausentes" mudar, atualiza nos 3 lugares
+// (hook + VagasDev + VagasAdv). É 1 linha em cada — preferível ao acoplamento
+// via export/import que pode quebrar build em refactor.
+// =====================================================================
+const VALORES_AUSENTES = new Set(["", "Não informado", "Brasil"]);
+
+const estaAusente = (valor?: string): boolean => {
+  if (!valor) return true;
+  return VALORES_AUSENTES.has(valor.trim());
+};
+
+// =====================================================================
+// Cores (mantidas como no original)
+// =====================================================================
 const modalidadeCor: Record<string, string> = {
   Remoto: "#4FC3F7",
   Híbrido: "#FFB703",
@@ -41,14 +59,33 @@ const origemCor: Record<string, string> = {
   LinkedIn: "#0077B5",
 };
 
-const PLATAFORMAS_CANONICAS = ["Gupy", "LinkedIn"] as const;
+// Cor neutra usada em todos os indicadores de "campo ausente".
+const COR_AUSENTE = "#6b7280";
 
-// Rotas consumidas — definidas fora do componente para não mudar a cada render
+// =====================================================================
+// Opções estáticas dos dropdowns
+// =====================================================================
+const OPCOES_NIVEL: OpcaoMultiSelect[] = [
+  { value: "estagio", label: "Estágio" },
+  { value: "junior", label: "Júnior" },
+  { value: "pleno", label: "Pleno" },
+  { value: "senior", label: "Sênior" },
+];
+
+const OPCOES_MODALIDADE: OpcaoMultiSelect[] = [
+  { value: "Remoto", label: "Remoto", cor: modalidadeCor.Remoto },
+  { value: "Híbrido", label: "Híbrido", cor: modalidadeCor.Híbrido },
+  { value: "Presencial", label: "Presencial", cor: modalidadeCor.Presencial },
+];
+
 const ROTAS_DEV = [
   ROUTES.FIREBASE_VAGAS_DEV_GUPY,
   ROUTES.FIREBASE_VAGAS_DEV_LINKEDIN,
 ];
 
+// =====================================================================
+// Helpers de formatação
+// =====================================================================
 function formatarData(iso: string): string {
   if (!iso) return "—";
   try {
@@ -67,10 +104,6 @@ function corPrazo(prazoIso: string): { cor: string; texto: string } {
   return { cor: "#34D399", texto: `até ${formatarData(prazoIso)}` };
 }
 
-/**
- * Formata "atualizado há X" em linguagem natural.
- * "agora mesmo" / "há 5 min" / "há 2h" / "há 1d"
- */
 function formatarTempoRelativo(timestamp: number | null): string {
   if (!timestamp) return "";
   const diffMs = Date.now() - timestamp;
@@ -84,27 +117,49 @@ function formatarTempoRelativo(timestamp: number | null): string {
   return `há ${diffD}d`;
 }
 
+/**
+ * Formata texto de localização considerando campos potencialmente ausentes.
+ * Sempre retorna { texto, ausente } — caller decide renderização.
+ */
+function formatarLocalizacao(city?: string, state?: string): { texto: string; ausente: boolean } {
+  const cityValido = !estaAusente(city);
+  const stateValido = !estaAusente(state);
+
+  if (!cityValido && !stateValido) {
+    return { texto: "Local não informado", ausente: true };
+  }
+  if (cityValido && stateValido) {
+    return { texto: `${city}, ${state}`, ausente: false };
+  }
+  if (cityValido) {
+    return { texto: city!, ausente: false };
+  }
+  return { texto: state!, ausente: false };
+}
+
 const selectBase: React.CSSProperties = {
   background: "rgba(255,255,255,0.05)",
   border: "1px solid rgba(255,255,255,0.09)",
   borderRadius: "10px",
 };
 
+// =====================================================================
+// Componente principal
+// =====================================================================
 export default function VagasDev() {
   const [vagaSelecionada, setVagaSelecionada] = useState<IVaga | null>(null);
 
-  // Cache + fetch centralizado no hook
   const { vagas: vagasRaw, carregando, atualizando, atualizadoEm, recarregar } = useCacheVagas(ROTAS_DEV);
 
   const {
     busca, setBusca,
-    filtroModalidade, setFiltroModalidade,
     ordenacao, setOrdenacao,
-    filtroEstado, setFiltroEstado,
-    filtroNivel, setFiltroNivel,
-    filtroContrato, setFiltroContrato,
+    filtrosModalidade, setFiltrosModalidade,
+    filtrosNivel, setFiltrosNivel,
+    filtrosEstado, setFiltrosEstado,
+    filtrosContrato, setFiltrosContrato,
+    filtrosOrigem, setFiltrosOrigem,
     filtroPcd, setFiltroPcd,
-    filtroOrigem, setFiltroOrigem,
     estadosDisponiveis,
     contratosDisponiveis,
     origensDisponiveis,
@@ -112,6 +167,24 @@ export default function VagasDev() {
     vagasFiltradas, vagasPagina, totalPaginas, paginasVisiveis,
     filtrosAtivos, totalFiltrosAtivos, limparFiltros,
   } = useFiltrosVagas(vagasRaw);
+
+  const opcoesEstado: OpcaoMultiSelect[] = estadosDisponiveis.map((uf) => ({
+    value: uf,
+    label: uf,
+  }));
+
+  const opcoesContrato: OpcaoMultiSelect[] = contratosDisponiveis.map((tipo) => ({
+    value: tipo,
+    label: tipo,
+  }));
+
+  const toggleOrigem = (origem: string) => {
+    if (filtrosOrigem.includes(origem)) {
+      setFiltrosOrigem(filtrosOrigem.filter((o) => o !== origem));
+    } else {
+      setFiltrosOrigem([...filtrosOrigem, origem]);
+    }
+  };
 
   return (
     <PageTransition>
@@ -141,12 +214,6 @@ export default function VagasDev() {
             flex-direction: column;
             align-items: stretch;
           }
-        }
-
-        .toggles-modalidade {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
         }
 
         @keyframes spin {
@@ -203,7 +270,6 @@ export default function VagasDev() {
               minWidth: 0,
             }}
           >
-            {/* Cabeçalho: título + contador + atualizar + limpar */}
             <div className="flex items-center justify-between gap-3 flex-wrap w-full">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <SlidersHorizontal size={16} color="#A0AEC0" />
@@ -225,7 +291,6 @@ export default function VagasDev() {
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
-                {/* Botão Atualizar + timestamp */}
                 {!carregando && (
                   <div className="flex items-center gap-2">
                     {atualizadoEm && (
@@ -246,7 +311,6 @@ export default function VagasDev() {
                   </div>
                 )}
 
-                {/* Botão Limpar filtros (só aparece se há filtros ativos) */}
                 {totalFiltrosAtivos > 0 && (
                   <button
                     onClick={limparFiltros}
@@ -260,7 +324,6 @@ export default function VagasDev() {
               </div>
             </div>
 
-            {/* Linha: Busca + Modalidade + Ordenação */}
             <div className="linha-busca">
               <div className="relative flex items-center flex-1" style={{ minWidth: 0 }}>
                 <Search className="absolute left-4" size={16} color="#4FC3F7" style={{ pointerEvents: "none" }} />
@@ -283,27 +346,13 @@ export default function VagasDev() {
                 />
               </div>
 
-              <div
-                className="toggles-modalidade p-1.5 rounded-[12px] shrink-0"
-                style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)" }}
-              >
-                {["Remoto", "Híbrido", "Presencial"].map((f) => {
-                  const isActive = filtroModalidade === f;
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => setFiltroModalidade(isActive ? null : f)}
-                      className="px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-200"
-                      style={{
-                        background: isActive ? "#FFB703" : "transparent",
-                        color: isActive ? "#050015" : "#A0AEC0",
-                        fontWeight: isActive ? 600 : 500,
-                      }}
-                    >
-                      {f}
-                    </button>
-                  );
-                })}
+              <div style={{ width: "200px", flexShrink: 0 }}>
+                <FiltroMultiSelect
+                  placeholder="Modalidade"
+                  opcoes={OPCOES_MODALIDADE}
+                  selecionados={filtrosModalidade}
+                  onChange={setFiltrosModalidade}
+                />
               </div>
 
               <select
@@ -317,7 +366,7 @@ export default function VagasDev() {
               </select>
             </div>
 
-            {/* Linha destacada: Plataforma — sempre visível */}
+            {/* Plataforma */}
             <div
               className="flex flex-col gap-2 w-full"
               style={{
@@ -332,101 +381,73 @@ export default function VagasDev() {
                 <span className="text-[11px] text-[#4FC3F7] font-semibold uppercase tracking-wider">
                   Plataforma
                 </span>
+                {filtrosOrigem.length > 0 && (
+                  <span className="text-[10px] text-[#4FC3F7] opacity-70">
+                    ({filtrosOrigem.length} {filtrosOrigem.length === 1 ? "selecionada" : "selecionadas"})
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setFiltroOrigem("todas")}
-                  className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
-                  style={{
-                    background: filtroOrigem === "todas" ? "#4FC3F7" : "rgba(0,0,0,0.2)",
-                    color: filtroOrigem === "todas" ? "#050015" : "#A0AEC0",
-                    fontWeight: filtroOrigem === "todas" ? 600 : 500,
-                    border: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  Todas
-                </button>
-
-                {PLATAFORMAS_CANONICAS.map((origem) => {
-                  const disponivel = origensDisponiveis.includes(origem);
-                  const isActive = filtroOrigem === origem;
+                {origensDisponiveis.map((origem) => {
+                  const isActive = filtrosOrigem.includes(origem);
                   const cor = origemCor[origem] ?? "#94A3B8";
 
                   return (
                     <button
                       key={origem}
-                      onClick={() => disponivel && setFiltroOrigem(origem)}
-                      disabled={!disponivel}
+                      onClick={() => toggleOrigem(origem)}
                       title={
-                        disponivel
-                          ? `Mostrar apenas vagas do ${origem}`
-                          : `Ainda não há vagas do ${origem} nesta categoria`
+                        isActive
+                          ? `Remover filtro do ${origem}`
+                          : `Adicionar vagas do ${origem}`
                       }
                       className="px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all duration-200"
                       style={{
                         background: isActive ? cor : "rgba(0,0,0,0.2)",
-                        color: isActive ? "#050015" : disponivel ? "#A0AEC0" : "#4a4a6a",
+                        color: isActive ? "#050015" : "#A0AEC0",
                         fontWeight: isActive ? 600 : 500,
-                        border: `1px solid ${disponivel ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)"}`,
-                        cursor: disponivel ? "pointer" : "not-allowed",
-                        opacity: disponivel ? 1 : 0.45,
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        cursor: "pointer",
                       }}
                     >
                       {origem}
                     </button>
                   );
                 })}
+
+                {filtrosOrigem.length === 0 && (
+                  <span className="text-[11px] text-[#6b7280] italic ml-1">
+                    Nenhum filtro = todas as plataformas
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Grid: Nível + Estado + Contrato + PCD */}
             <div className="filtros-grid">
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <GraduationCap className="absolute left-3 pointer-events-none" size={15} color="#A0AEC0" />
-                <select
-                  value={filtroNivel}
-                  onChange={(e) => setFiltroNivel(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "36px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Nível</option>
-                  <option value="estagio" style={{ color: "#050015" }}>Estágio</option>
-                  <option value="junior" style={{ color: "#050015" }}>Júnior</option>
-                  <option value="pleno" style={{ color: "#050015" }}>Pleno</option>
-                  <option value="senior" style={{ color: "#050015" }}>Sênior</option>
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<GraduationCap size={15} />}
+                placeholder="Qualquer Nível"
+                opcoes={OPCOES_NIVEL}
+                selecionados={filtrosNivel}
+                onChange={setFiltrosNivel}
+              />
 
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <MapPin className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
-                <select
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Estado</option>
-                  {estadosDisponiveis.map((uf) => (
-                    <option key={uf} value={uf} style={{ color: "#050015" }}>{uf}</option>
-                  ))}
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<MapPin size={14} />}
+                placeholder="Qualquer Estado"
+                opcoes={opcoesEstado}
+                selecionados={filtrosEstado}
+                onChange={setFiltrosEstado}
+              />
 
-              <div className="relative flex items-center" style={{ minWidth: 0 }}>
-                <Briefcase className="absolute left-3 pointer-events-none" size={14} color="#A0AEC0" />
-                <select
-                  value={filtroContrato}
-                  onChange={(e) => setFiltroContrato(e.target.value)}
-                  className="w-full h-[44px] text-[13px] text-white outline-none cursor-pointer appearance-none"
-                  style={{ ...selectBase, paddingLeft: "34px", paddingRight: "16px", minWidth: 0 }}
-                >
-                  <option value="todos" style={{ color: "#050015" }}>Qualquer Contrato</option>
-                  {contratosDisponiveis.map((tipo) => (
-                    <option key={tipo} value={tipo} style={{ color: "#050015" }}>{tipo}</option>
-                  ))}
-                </select>
-              </div>
+              <FiltroMultiSelect
+                icone={<Briefcase size={14} />}
+                placeholder="Qualquer Contrato"
+                opcoes={opcoesContrato}
+                selecionados={filtrosContrato}
+                onChange={setFiltrosContrato}
+              />
 
               <button
                 onClick={() => setFiltroPcd(!filtroPcd)}
@@ -444,7 +465,6 @@ export default function VagasDev() {
               </button>
             </div>
 
-            {/* Chips de filtros ativos */}
             {totalFiltrosAtivos > 0 && (
               <div
                 className="flex flex-wrap gap-2 pt-3 w-full"
@@ -533,12 +553,23 @@ export default function VagasDev() {
           {!carregando && vagasPagina.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
               {vagasPagina.map((vaga) => {
-                const corMod = modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
-                const corCont = contratoCor[vaga.tipo_contrato || ""] ?? "#94A3B8";
+                // Detecção de campos ausentes — cada flag controla se o card
+                // mostra dado real ou indicador "Não informado" + ícone de alerta.
+                const modalidadeAusente = estaAusente(vaga.modalidade);
+                const contratoAusente = estaAusente(vaga.tipo_contrato);
+                const localizacao = formatarLocalizacao(vaga.city, vaga.state);
+
+                const corMod = modalidadeAusente
+                  ? COR_AUSENTE
+                  : modalidadeCor[vaga.modalidade] ?? "#A0AEC0";
+                const corCont = contratoAusente
+                  ? COR_AUSENTE
+                  : contratoCor[vaga.tipo_contrato ?? ""] ?? "#94A3B8";
                 const corOri = origemCor[vaga.origem] ?? "#94A3B8";
-                const temLocal = vaga.city && vaga.city !== "Não informado";
-                const prazo = vaga.prazo_inscricao && vaga.prazo_inscricao !== "Não informado"
-                  ? corPrazo(vaga.prazo_inscricao) : null;
+
+                const prazo = vaga.prazo_inscricao && !estaAusente(vaga.prazo_inscricao)
+                  ? corPrazo(vaga.prazo_inscricao)
+                  : null;
 
                 return (
                   <div
@@ -570,11 +601,19 @@ export default function VagasDev() {
                       <h3 className="text-[16px] font-semibold text-white leading-snug flex-1 group-hover:text-[#4FC3F7] transition-colors">
                         {vaga.titulo}
                       </h3>
+                      {/* Badge de modalidade — com ícone de alerta quando ausente */}
                       <span
-                        className="text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                        style={{ background: `${corMod}15`, color: corMod, border: `1px solid ${corMod}30` }}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 flex items-center gap-1"
+                        style={{
+                          background: `${corMod}15`,
+                          color: corMod,
+                          border: `1px solid ${corMod}30`,
+                          fontStyle: modalidadeAusente ? "italic" : "normal",
+                        }}
+                        title={modalidadeAusente ? "Modalidade não informada na vaga original" : undefined}
                       >
-                        {vaga.modalidade}
+                        {modalidadeAusente && <AlertCircle size={10} />}
+                        {modalidadeAusente ? "Modalidade não informada" : vaga.modalidade}
                       </span>
                     </div>
 
@@ -597,21 +636,34 @@ export default function VagasDev() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 mb-4">
-                      {temLocal && (
-                        <span className="text-[11px] text-[#A0AEC0] flex items-center gap-1">
-                          <MapPin size={11} />
-                          {vaga.city}
-                          {vaga.state && vaga.state !== "Não informado" ? `, ${vaga.state}` : ""}
-                        </span>
-                      )}
-                      {vaga.tipo_contrato && vaga.tipo_contrato !== "Não informado" && (
-                        <span
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: `${corCont}15`, color: corCont, border: `1px solid ${corCont}30` }}
-                        >
-                          {vaga.tipo_contrato}
-                        </span>
-                      )}
+                      {/* Localização — sempre renderiza, com indicador se ausente */}
+                      <span
+                        className="text-[11px] flex items-center gap-1"
+                        style={{
+                          color: localizacao.ausente ? COR_AUSENTE : "#A0AEC0",
+                          fontStyle: localizacao.ausente ? "italic" : "normal",
+                        }}
+                        title={localizacao.ausente ? "Localização não informada na vaga original" : undefined}
+                      >
+                        {localizacao.ausente ? <AlertCircle size={11} /> : <MapPin size={11} />}
+                        {localizacao.texto}
+                      </span>
+
+                      {/* Contrato — sempre renderiza, com indicador se ausente */}
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
+                        style={{
+                          background: `${corCont}15`,
+                          color: corCont,
+                          border: `1px solid ${corCont}30`,
+                          fontStyle: contratoAusente ? "italic" : "normal",
+                        }}
+                        title={contratoAusente ? "Tipo de contrato não informado na vaga original" : undefined}
+                      >
+                        {contratoAusente && <AlertCircle size={10} />}
+                        {contratoAusente ? "Contrato não informado" : vaga.tipo_contrato}
+                      </span>
+
                       {vaga.pcd && (
                         <span
                           className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
